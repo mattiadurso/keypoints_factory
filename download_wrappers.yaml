@@ -41,6 +41,15 @@
                     wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_detector_L.pth -P wrappers/dedode
       ]
     }
+  ],
+  "aliked": [
+    {
+      "url": https://github.com/Shiaoming/ALIKED.git,
+      "dest": aliked,
+      "submodules": [
+                    bash wrappers/aliked/fix_custom_ops.sh
+      ]
+    }
   ]
 }
 

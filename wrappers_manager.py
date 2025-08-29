@@ -1,5 +1,5 @@
 def get_wrappers_list():
-    return ['disk', 'dedode',  'aliked', 'dedode-G', 'superpoint', 'silk', 'dad', 'ripe', 'random', 'no_wrapper']
+    return ['disk', 'superpoint', 'ripe', 'dedode', 'dedode-G', 'aliked',  'random', 'no_wrapper']
 
 
 def wrappers_manager(name, device, mismatches=0):
@@ -26,17 +26,12 @@ def wrappers_manager(name, device, mismatches=0):
         wrapper.name = name
     
     elif name == 'dedode-G':
-        from DeDoDe_all.dedode_wrapper import DeDoDeWrapper
+        from wrappers.dedode.dedode_wrapper import DeDoDeWrapper
         wrapper = DeDoDeWrapper(device=device, descriptor_G=True)
-        wrapper.name = name
-
-    elif name == 'silk':
-        from silk.silk_wrapper import SilkWrapper
-        wrapper = SilkWrapper(device=device)
         wrapper.name = name
     
     elif name == 'aliked':
-        from ALIKED.aliked_wrapper import AlikedWrapper
+        from wrappers.aliked.aliked_wrapper import AlikedWrapper
         wrapper = AlikedWrapper(device=device)
         wrapper.name = name
     
@@ -44,14 +39,7 @@ def wrappers_manager(name, device, mismatches=0):
         from random_wrapper import RandomPointsWrapper
         wrapper = RandomPointsWrapper(mismatch_perc=mismatches)
         wrapper.name = name
-
-    elif name == 'dad':
-        from DaD.dad_wrapper import DaDWrapper
-        wrapper = DaDWrapper(device=device)
-        wrapper.name = name
     
-
-
     # if name is a tuple
     elif '_' in name:
         from mix_kpts_desc_wrapper import MixKptsDescsWrapper
