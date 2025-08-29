@@ -5,7 +5,7 @@ from torch import Tensor
 from torchvision import transforms
 
 from libutils.utils_local_feature_wrapper import LocalFeatureWrapper, LocalFeatureOutput
-from superpoint.superpoint.superpoint import SuperPoint
+from wrappers.superpoint.superpoint.superpoint import SuperPoint
 from libutils.utils_2D import grid_sample_nan
 
 class SuperPointWrapper(LocalFeatureWrapper):

@@ -1,27 +1,27 @@
 def get_wrappers_list():
-    return ['disk', 'strek', 'dedode',  'aliked', 'dedode-G', 'superpoint', 'silk', 'dad', 'ripe', 'random', 'no_wrapper']
+    return ['disk', 'dedode',  'aliked', 'dedode-G', 'superpoint', 'silk', 'dad', 'ripe', 'random', 'no_wrapper']
 
 
 def wrappers_manager(name, device, mismatches=0):
     print(f'Creating wrapper for {name} on device {device}.\n')
 
     if name == 'disk':
-        from DISK.disk_wrapper import DiskWrapper
+        from wrappers.disk.disk_wrapper import DiskWrapper
         wrapper = DiskWrapper(device=device)
         wrapper.name = name
     
     elif name == 'superpoint':
-        from superpoint.superpoint_wrapper import SuperPointWrapper
+        from wrappers.superpoint.superpoint_wrapper import SuperPointWrapper
         wrapper = SuperPointWrapper(device=device)
         wrapper.name = name
-    
-    elif name == 'strek':
-        from Strek.strek_wrapper import StrekWrapper
-        wrapper = StrekWrapper(device=device)
+
+    elif name == 'ripe':
+        from wrappers.ripe.ripe_wrapper import RIPEWrapper
+        wrapper = RIPEWrapper(device=device)
         wrapper.name = name
     
     elif name == 'dedode' or name == 'dedode-B':
-        from DeDoDe_all.dedode_wrapper import DeDoDeWrapper
+        from wrappers.dedode.dedode_wrapper import DeDoDeWrapper
         wrapper = DeDoDeWrapper(device=device)
         wrapper.name = name
     
@@ -50,10 +50,7 @@ def wrappers_manager(name, device, mismatches=0):
         wrapper = DaDWrapper(device=device)
         wrapper.name = name
     
-    elif name == 'ripe':
-        from RIPE.RIPE_wrapper import RIPEWrapper
-        wrapper = RIPEWrapper(device=device)
-        wrapper.name = name
+
 
     # if name is a tuple
     elif '_' in name:
