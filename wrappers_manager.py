@@ -11,7 +11,7 @@ def wrappers_manager(name, device, mismatches=0):
         wrapper.name = name
     
     elif name == 'superpoint':
-        from SuperPoint.superpoint_wrapper import SuperPointWrapper
+        from superpoint.superpoint_wrapper import SuperPointWrapper
         wrapper = SuperPointWrapper(device=device)
         wrapper.name = name
     
