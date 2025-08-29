@@ -73,11 +73,11 @@ class DeDoDeWrapper():
 
                 out = self.descriptor.describe_keypoints(batch, kpts)
                 des = out['descriptions'][0] 
-                des_vol = out['description_grid']
+                # des_vol = out['description_grid']
 
-                if self.descriptor_G:
-                    # need to crop back to original size
-                    des_vol = des_vol[:, :, :h1, :w1]
+                # if self.descriptor_G:
+                #     # need to crop back to original size
+                #     des_vol = des_vol[:, :, :h1, :w1]
                     
             # custom descriptor network
             elif self.descriptor_network is not None:
@@ -91,7 +91,7 @@ class DeDoDeWrapper():
             kpts=kpts_pix[0],
             kpts_scores=scores[0],
             des=des,
-            des_vol=des_vol
+            # des_vol=des_vol
         )
 
         return output
