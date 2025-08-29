@@ -1,0 +1,12 @@
+{
+  "superpoint": [
+    {
+      "url": https://huggingface.co/spaces/Realcat/image-matching-webui/resolve/a517c83931cc80691d4bbf17b4d2a49115a83441/third_party/SuperGluePretrainedNetwork/models/superpoint.py,
+      "dest": superpoint
+    },
+    {
+      "url": https://huggingface.co/spaces/Realcat/image-matching-webui/resolve/a517c83931cc80691d4bbf17b4d2a49115a83441/third_party/SuperGluePretrainedNetwork/models/weights/superpoint_v1.pth,
+      "dest": superpoint/weights
+    }
+  ]
+}

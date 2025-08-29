@@ -1,0 +1,5 @@
+libutils/*
+libutils_md/*
+utils/*
+download_test.ipynb
+*/__pycache__/
