@@ -35,6 +35,11 @@ def wrappers_manager(name, device, mismatches=0):
         wrapper = AlikedWrapper(device=device)
         wrapper.name = name
     
+    elif name == 'sift':
+        from wrappers.sift.sift_wrapper import SIFTPyColmapWrapper
+        wrapper = SIFTPyColmapWrapper(device=device)
+        wrapper.name = name
+
     elif name == 'random':
         from random_wrapper import RandomPointsWrapper
         wrapper = RandomPointsWrapper(mismatch_perc=mismatches)

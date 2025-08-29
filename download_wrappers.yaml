@@ -50,6 +50,17 @@
                     bash wrappers/aliked/fix_custom_ops.sh
       ]
     }
+  ],
+  "sift": [
+    {
+      "url": null,
+      "dest": sift,
+      "submodules": [
+                    # pip install pycolmap git+https://github.com/colmap/pycolmap.git --no-binary pycolmap
+                    pip install pycolmap
+
+      ]
+    }
   ]
 }
 
