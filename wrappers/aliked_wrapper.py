@@ -1,12 +1,8 @@
 from pathlib import Path
 import sys
-import os
 import torch
-from torch import Tensor
 import numpy as np
-from typing import Union, List
-from libutils.utils_2D import grid_sample_nan
-from utils.method_wrapper import MethodOutput
+
 
 sys.path.append('methods/aliked')
 from methods.aliked.nets.aliked import ALIKED
@@ -48,19 +44,7 @@ class AlikedWrapper(MethodWrapper):
 
                 des_vol = self.descriptor_network(x)
                 kpts = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
-                des = grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
+                des = self.grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
 
         return MethodOutput(kpts=kpts, kpts_scores=scores, des=des)
 
-
-
-
-    
-if __name__=='__main__':
-    # test
-    img = np.random.rand(480,640,3).astype(np.float32)
-    wrapper = AlikedWrapper()
-    img_t = wrapper.img_from_numpy(img)
-    out = wrapper.extract(img_t)
-    print(out.kpts.shape, out.kpts_scores.shape, out.des.shape)
-    print(out.kpts[:5], out.kpts_scores[:5], out.des[:5])

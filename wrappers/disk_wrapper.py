@@ -13,7 +13,6 @@ import torch
 from torch import Tensor
 import torch.nn.functional as F
 
-from libutils.utils_2D import grid_sample_nan
 
 from methods.disk.disk import DISK
 from wrappers.wrapper import MethodWrapper, MethodOutput
@@ -60,7 +59,7 @@ class DiskWrapper(MethodWrapper):
 
             if self.custom_descriptor is not None:
                 des_vol = self.custom_descriptor(img[None])
-                des = grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
+                des = self.grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
 
         return MethodOutput(kpts=kpts, kpts_scores=kpts_scores, des=des)
 

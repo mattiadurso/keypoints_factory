@@ -225,6 +225,80 @@ class MethodWrapper(ABC):
         I would be nice to have this to print all torchinfo.summary infos
         """
         raise NotImplementedError
+    
+    
+    def grid_sample_nan(self, xy: Tensor, img: Tensor, mode='nearest') -> Tuple[Tensor, Tensor]:
+        """ pytorch grid_sample with embedded coordinate normalization and grid nan handling (if a nan is present in xy,
+        the output will be nan). Works both with input with shape Bxnx2 and B x n0 x n1 x 2
+        xy point that fall outside the image are treated as nan (those which are really close are interpolated using
+        border padding mode)
+        Args:
+            xy: input coordinates (with the convention top-left pixel center at (0.5, 0.5))
+                B,n,2 or B,n0,n1,2
+            img: the image where the sampling is done
+                BxCxHxW or BxHxW
+            mode: the interpolation mode
+        Returns:
+            sampled: the sampled values
+                BxCxN or BxCxN0xN1 (if no C dimension in input BxN or BxN0xN1)
+            mask_img_nan: mask of the points that had a nan in the img. The points xy that were nan appear as false in the
+                mask in the same way as point that had a valid img value. This is done to discriminate between invalid
+                sampling position and valid sampling position with a nan value in the image
+                BxN or BxN0xN1
+        """
+        assert img.dim() in {3, 4}
+        if img.dim() == 3:
+            # ? remove the channel dimension from the result at the end of the function
+            squeeze_result = True
+            img.unsqueeze_(1)
+        else:
+            squeeze_result = False
+
+        assert xy.shape[-1] == 2
+        assert xy.dim() == 3 or xy.dim() == 4, f'xy must have 3 or 4 dimensions, got {xy.dim()}'
+        B, C, H, W = img.shape
+
+        xy_norm = self.normalize_pixel_coordinates(xy, img.shape[-2:])  # BxNx2 or BxN0xN1x2
+        # ? set to nan the point that fall out of the second image
+        xy_norm[(xy_norm < -1) + (xy_norm > 1)] = float('nan')
+        if xy.ndim == 3:
+            sampled = F.grid_sample(img, xy_norm[:, :, None, ...], align_corners=False, mode=mode,
+                                    padding_mode='border').view(B, C, xy.shape[1])  # BxCxN
+        else:
+            sampled = F.grid_sample(img, xy_norm, align_corners=False, mode=mode, padding_mode='border')  # BxCxN0xN1
+        # ? points xy that are not nan and have nan img. The sum is just to squash the channel dimension
+        mask_img_nan = th.isnan(sampled.sum(1))  # BxN or BxN0xN1
+        # ? set to nan the sampled values for points xy that were nan (grid_sample consider those as (-1, -1))
+        xy_invalid = xy_norm.isnan().any(-1)  # BxN or BxN0xN1
+        if xy.ndim == 3:
+            sampled[xy_invalid[:, None, :].repeat(1, C, 1)] = float('nan')
+        else:
+            sampled[xy_invalid[:, None, :, :].repeat(1, C, 1, 1)] = float('nan')
+
+        if squeeze_result:
+            img.squeeze_(1)
+            sampled.squeeze_(1)
+
+        return sampled, mask_img_nan
+
+
+    def normalize_pixel_coordinates(self, xy: Tensor, shape: Tuple[int, int]) -> Tensor:
+        """ normalize pixel coordinates from -1 to +1. Being (-1,-1) the exact top left corner of the image
+        the coordinates must be given in a way that the center of pixel is at half coordinates (0.5,0.5)
+        xy ordered as (x, y) and shape ordered as (H, W)
+        Args:
+            xy: input coordinates in order (x,y) with the convention top-left pixel center is at coordinates (0.5, 0.5)
+                ...x2
+            shape: shape of the image in the order (H, W)
+        Returns:
+            xy_norm: normalized coordinates between [-1, 1]
+        """
+        xy_norm = xy.clone()
+        # ! the shape index are flipped because the coordinates are given as x,y but shape is H,W
+        xy_norm[..., 0] = 2 * xy_norm[..., 0] / shape[1]
+        xy_norm[..., 1] = 2 * xy_norm[..., 1] / shape[0]
+        xy_norm -= 1
+        return xy_norm
 
 
 

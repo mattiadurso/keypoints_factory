@@ -4,8 +4,6 @@ file_path = Path(__file__).resolve().parent
 sys.path.append('wrappers/dedode')
 
 import torch
-import torch.nn.functional as F
-from libutils.utils_2D import grid_sample_nan
 from torchvision import transforms
 
 from wrappers.wrapper import MethodWrapper, MethodOutput
@@ -46,14 +44,13 @@ class DeDoDeWrapper(MethodWrapper):
             if self.custom_descriptor is None:
                 if self.descriptor_G:
                     x_14 = self.pad_multiple_of(x, 14)
-                    print(x_14.shape)
                     batch = {"image": self.normalizer(x_14)}
                 out = self.descriptor.describe_keypoints(batch, kpts)
                 des = out['descriptions'][0]    
 
             else:  # custom descriptor network
                 des_vol = self.custom_descriptor(x)
-                des = grid_sample_nan(kpts_pix[None], des_vol, mode='nearest')[0][0].permute(1,2,0)[0]
+                des = self.grid_sample_nan(kpts_pix[None], des_vol, mode='nearest')[0][0].permute(1,2,0)[0]
 
         output = MethodOutput(kpts=kpts_pix[0], kpts_scores=scores[0], des=des)
 
