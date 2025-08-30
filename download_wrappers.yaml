@@ -14,9 +14,9 @@
       "url": https://github.com/cvlab-epfl/disk.git,
       "dest": disk,
       "submodules": [
-                      pip install -e wrappers/disk/disk/submodules/torch-dimcheck,
-                      pip install -e wrappers/disk/disk/submodules/torch-localize,
-                      pip install -e wrappers/disk/disk/submodules/unets
+                      pip install -e methods/disk/submodules/torch-dimcheck,
+                      pip install -e methods/disk/submodules/torch-localize,
+                      pip install -e methods/disk/submodules/unets
         ]
     }
   ],
@@ -35,10 +35,11 @@
       "url": https://github.com/Parskatt/DeDoDe.git,
       "dest": dedode,
       "submodules": [ 
-                    pip install -e wrappers/dedode/dedode
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_B.pth -P wrappers/dedode,
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_G.pth -P wrappers/dedode,
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_detector_L.pth -P wrappers/dedode
+                    pip install -e methods/dedode,
+                    mkdir -p methods/dedode/weights,
+                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_B.pth -P methods/dedode/weights,
+                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_G.pth -P methods/dedode/weights,
+                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_detector_L.pth -P methods/dedode/weights
       ]
     }
   ],
@@ -47,7 +48,7 @@
       "url": https://github.com/Shiaoming/ALIKED.git,
       "dest": aliked,
       "submodules": [
-                    bash wrappers/aliked/fix_custom_ops.sh
+                    bash bash/fix_aliked_custom_ops.sh
       ]
     }
   ],
