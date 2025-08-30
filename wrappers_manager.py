@@ -6,37 +6,37 @@ def wrappers_manager(name, device, mismatches=0):
     print(f'Creating wrapper for {name} on device {device}.\n')
 
     if name == 'disk':
-        from wrappers.disk.disk_wrapper import DiskWrapper
+        from wrappers.disk_wrapper import DiskWrapper
         wrapper = DiskWrapper(device=device)
         wrapper.name = name
     
     elif name == 'superpoint':
-        from wrappers.superpoint.superpoint_wrapper import SuperPointWrapper
+        from wrappers.superpoint_wrapper import SuperPointWrapper
         wrapper = SuperPointWrapper(device=device)
         wrapper.name = name
 
     elif name == 'ripe':
-        from wrappers.ripe.ripe_wrapper import RIPEWrapper
+        from wrappers.ripe_wrapper import RIPEWrapper
         wrapper = RIPEWrapper(device=device)
         wrapper.name = name
     
     elif name == 'dedode' or name == 'dedode-B':
-        from wrappers.dedode.dedode_wrapper import DeDoDeWrapper
+        from wrappers.dedode_wrapper import DeDoDeWrapper
         wrapper = DeDoDeWrapper(device=device)
         wrapper.name = name
     
     elif name == 'dedode-G':
-        from wrappers.dedode.dedode_wrapper import DeDoDeWrapper
+        from wrappers.dedode_wrapper import DeDoDeWrapper
         wrapper = DeDoDeWrapper(device=device, descriptor_G=True)
         wrapper.name = name
     
     elif name == 'aliked':
-        from wrappers.aliked.aliked_wrapper import AlikedWrapper
+        from wrappers.aliked_wrapper import AlikedWrapper
         wrapper = AlikedWrapper(device=device)
         wrapper.name = name
     
     elif name == 'sift':
-        from wrappers.sift.sift_wrapper import SIFTPyColmapWrapper
+        from wrappers.sift_wrapper import SIFTPyColmapWrapper
         wrapper = SIFTPyColmapWrapper(device=device)
         wrapper.name = name
 

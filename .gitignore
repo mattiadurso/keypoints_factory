@@ -4,3 +4,4 @@ utils/*
 download_test.ipynb
 **/__pycache__/**
 **/*.pth
+methods/*
