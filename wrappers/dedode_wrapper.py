@@ -3,18 +3,13 @@ import sys
 file_path = Path(__file__).resolve().parent
 sys.path.append('wrappers/dedode')
 
-import gc
 import torch
 import torch.nn.functional as F
-from torch import Tensor
-import numpy as np
-from typing import Union, List
 from libutils.utils_2D import grid_sample_nan
 from torchvision import transforms
 
 from wrappers.wrapper import MethodWrapper, MethodOutput
-
-from DeDoDe import dedode_detector_L, dedode_descriptor_B, dedode_descriptor_G # installed from Repos/DeDoDe
+from methods.dedode.DeDoDe import dedode_detector_L, dedode_descriptor_B, dedode_descriptor_G
 
 class DeDoDeWrapper(MethodWrapper):
     def __init__(self, descriptor_G:bool= False, device: str = 'cuda:0', border=16):

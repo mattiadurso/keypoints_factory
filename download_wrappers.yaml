@@ -35,7 +35,7 @@
       "url": https://github.com/Parskatt/DeDoDe.git,
       "dest": dedode,
       "submodules": [ 
-                    pip install -e methods/dedode,
+                    # pip install -e methods/dedode,
                     mkdir -p methods/dedode/weights,
                     wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_B.pth -P methods/dedode/weights,
                     wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_G.pth -P methods/dedode/weights,
