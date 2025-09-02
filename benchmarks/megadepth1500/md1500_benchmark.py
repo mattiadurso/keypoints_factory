@@ -46,7 +46,7 @@ class MegaDepthPoseMNNBenchmark:
         self.th = th
 
         if matcher == 'mnn':
-            self.matcher = MNN(min_score=min_score, ratio_test=ratio_test, device='cpu')
+            self.matcher = MNN(min_score=min_score, ratio_test=ratio_test)
             self.matcher.name = 'mnn'
         elif matcher == 'dual_softmax':
             self.matcher = DualSoftMaxMatcher()
