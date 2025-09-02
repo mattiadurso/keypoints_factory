@@ -131,67 +131,43 @@ class MethodOutput:
     def keys(self) -> List[str]:
         return list(self.__dict__.keys())
 
-
 class MethodWrapper(ABC):
-    def __init__(self, name: str, border: int = 0, device: str = 'cpu', use_amp=False):
+    def __init__(self, name: str, border: int = 0, device: str = 'cpu', use_amp=True):
         self.name = name
         self.border = border
         self.device = device
-        self.multiple_of = 16 # need to be set to 14 if using DeDoDe-G
         self.to_torch = transforms.ToTensor()
         self.custom_descriptor = None
 
         # amp 
         self.use_amp = use_amp
-        self.amp_dtype = torch.bfloat16  # can be changed to torch.float16 if needed
-    
+        if self.use_amp:
+            print(f"Using automatic mixed precision.")
+        self.amp_dtype = torch.float16  
     def load_image(self, path):
         img = io.imread(path)
         return self.img_from_numpy(img)
 
     def img_from_numpy(self, img: np.ndarray) -> Union[Tensor, np.ndarray]:
-        """
-        This need to be change donly for dedode-G to 14.
-        """
         assert img.dtype == np.uint8, f"Image must be uint8, got {img.dtype}" # otherwise no scaling in ToTensor()
-        img = self.crop_multiple_of(img)
+        img = self.crop_multiple_of(img, multiple_of=16)
         img_out = self.to_torch(img).to(self.device) 
         return img_out
 
-    def crop_multiple_of(self, img):
-        assert isinstance(img, np.ndarray)
-
-        H, W = img.shape[:2]
-        new_H = (H // self.multiple_of) * self.multiple_of
-        new_W = (W // self.multiple_of) * self.multiple_of
-        return img[:new_H, :new_W, :]
-
-    def pad_multiple_of(self, img, pad):
+    def crop_multiple_of(self, img, multiple_of=16):
         if isinstance(img, np.ndarray):
-            # HWC
             H, W = img.shape[:2]
-            pad_h = (pad - H % pad) % pad
-            pad_w = (pad - W % pad) % pad
-            return np.pad(img, ((0, pad_h), (0, pad_w), (0, 0)), mode="constant")
+            new_H = (H // multiple_of) * multiple_of
+            new_W = (W // multiple_of) * multiple_of
+            return img[:new_H, :new_W, :]
         
-        elif isinstance(img, torch.Tensor):
-            if img.ndim == 3:  # CHW
-                _, H, W = img.shape
-                pad_h = (pad - H % pad) % pad
-                pad_w = (pad - W % pad) % pad
-                return F.pad(img, (0, pad_w, 0, pad_h), mode="constant", value=0)
-            
-            elif img.ndim == 4:  # BCHW
-                _, _, H, W = img.shape
-                pad_h = (pad - H % pad) % pad
-                pad_w = (pad - W % pad) % pad
-                return F.pad(img, (0, pad_w, 0, pad_h), mode="constant", value=0)
-            
-            else:
-                raise ValueError(f"Unsupported tensor shape: {img.shape}")
-        
+        elif isinstance(img, Tensor):
+            H, W = img.shape[-2:]
+            new_H = (H // multiple_of) * multiple_of
+            new_W = (W // multiple_of) * multiple_of
+            return img[..., :new_H, :new_W]
         else:
-            raise TypeError(f"Unsupported image type: {type(img)}")
+            raise TypeError("Unsupported image type")
 
     def add_custom_descriptors(self, model):
         # can be whatever model that takes (B, C, H, W) as input and returns (B, D, H, W)
@@ -267,7 +243,7 @@ class MethodWrapper(ABC):
         else:
             sampled = F.grid_sample(img, xy_norm, align_corners=False, mode=mode, padding_mode='border')  # BxCxN0xN1
         # ? points xy that are not nan and have nan img. The sum is just to squash the channel dimension
-        mask_img_nan = th.isnan(sampled.sum(1))  # BxN or BxN0xN1
+        mask_img_nan = torch.isnan(sampled.sum(1))  # BxN or BxN0xN1
         # ? set to nan the sampled values for points xy that were nan (grid_sample consider those as (-1, -1))
         xy_invalid = xy_norm.isnan().any(-1)  # BxN or BxN0xN1
         if xy.ndim == 3:
