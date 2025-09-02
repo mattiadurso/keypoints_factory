@@ -3,6 +3,10 @@ import sys
 file_path = Path(__file__).resolve().parent
 sys.path.append('wrappers/dedode')
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+import gc
 import torch
 from torchvision import transforms
 
@@ -28,10 +32,21 @@ class DeDoDeWrapper(MethodWrapper):
 
         self.normalizer = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
+    def add_custom_descriptors(self, model):
+        self.custom_descriptor = model
+        # clean up
+        self.descriptor = None
+        gc.collect()
+        torch.cuda.empty_cache()
 
     @torch.inference_mode()
     def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
         x = x if x.dim() == 4 else x[None]
+
+        # eventually cropping to multiples of 14
+        if self.descriptor_G:
+            x = self.crop_multiple_of(x, multiple_of=14)
+
         batch = {"image": self.normalizer(x)}
 
         with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, enabled=self.use_amp):
@@ -42,9 +57,6 @@ class DeDoDeWrapper(MethodWrapper):
 
             # descriptors
             if self.custom_descriptor is None:
-                if self.descriptor_G:
-                    x_14 = self.pad_multiple_of(x, 14)
-                    batch = {"image": self.normalizer(x_14)}
                 out = self.descriptor.describe_keypoints(batch, kpts)
                 des = out['descriptions'][0]    
 
@@ -52,9 +64,7 @@ class DeDoDeWrapper(MethodWrapper):
                 des_vol = self.custom_descriptor(x)
                 des = self.grid_sample_nan(kpts_pix[None], des_vol, mode='nearest')[0][0].permute(1,2,0)[0]
 
-        output = MethodOutput(kpts=kpts_pix[0], kpts_scores=scores[0], des=des)
-
-        return output
+        return MethodOutput(kpts=kpts_pix[0], kpts_scores=scores[0], des=des)
 
 
     

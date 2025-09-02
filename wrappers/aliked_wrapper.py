@@ -25,9 +25,9 @@ class AlikedWrapper(MethodWrapper):
         # Aliked asked for max kpts to be set during initialization, 
         # in this way it's possible to change it in any moment
         if self.max_kpts != max_kpts:
-            description_network = self.descriptor_network
-            self.__init__(name='aliked', device=self.device, max_kpts=max_kpts, border=self.border)
-            self.descriptor_network = description_network
+            custom_descriptor = self.custom_descriptor
+            self.__init__(device=self.device, max_kpts=max_kpts, border=self.border)
+            self.custom_descriptor = custom_descriptor
         
         x = x if x.dim() == 4 else x[None]
 
@@ -42,7 +42,7 @@ class AlikedWrapper(MethodWrapper):
                 kpts, scores, _ = self.aliked.dkd(score_map)
                 kpts, scores = kpts[0], scores[0]
 
-                des_vol = self.descriptor_network(x)
+                des_vol = self.custom_descriptor(x)
                 kpts = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
                 des = self.grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
 
