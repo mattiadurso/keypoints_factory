@@ -1,66 +1,44 @@
-{
-  "superpoint": [
-    {
-      "url": https://github.com/magicleap/SuperGluePretrainedNetwork/blob/master/models/superpoint.py
-      "dest": superpoint
-    },
-    {
-      "url": https://github.com/magicleap/SuperGluePretrainedNetwork/blob/master/models/weights/superpoint_v1.pth,
-      "dest": superpoint/weights
-    }
-  ],
-  "disk": [
-    {
-      "url": https://github.com/cvlab-epfl/disk.git,
-      "dest": disk,
-      "submodules": [
-                      pip install -e methods/disk/submodules/torch-dimcheck,
-                      pip install -e methods/disk/submodules/torch-localize,
-                      pip install -e methods/disk/submodules/unets
-        ]
-    }
-  ],
-  "ripe": [
-    {
-      "url": https://github.com/fraunhoferhhi/RIPE.git,
-      "dest": ripe,
-      "submodules": [ 
-                      mkdir wrappers/ripe/ripe/ckpt,
-                      wget https://cvg.hhi.fraunhofer.de/RIPE/ripe_weights.pth -P wrappers/ripe/ripe/ckpt
-      ]
-    }
-  ],
-  "dedode": [
-    {
-      "url": https://github.com/Parskatt/DeDoDe.git,
-      "dest": dedode,
-      "submodules": [ 
-                    mkdir -p methods/dedode/weights,
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_B.pth -P methods/dedode/weights,
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_G.pth -P methods/dedode/weights,
-                    wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_detector_L.pth -P methods/dedode/weights
-      ]
-    }
-  ],
-  "aliked": [
-    {
-      "url": https://github.com/Shiaoming/ALIKED.git,
-      "dest": aliked,
-      "submodules": [
-                    bash bash/fix_aliked_custom_ops.sh
-      ]
-    }
-  ],
-  "sift": [
-    {
-      "url": null,
-      "dest": sift,
-      "submodules": [
-                    # pip install pycolmap git+https://github.com/colmap/pycolmap.git --no-binary pycolmap
-                    pip install pycolmap
+superpoint:
+  - url: "https://github.com/magicleap/SuperGluePretrainedNetwork.git"
+    dest: "superpoint"
+    commit: "ddcf11f42e7e0732a0c4607648f9448ea8d73590"
 
-      ]
-    }
-  ]
-}
+disk:
+  - url: "https://github.com/cvlab-epfl/disk.git"
+    dest: "disk"
+    commit: "8dc6d4d65b47210f629e21ad1fbfb56944b11696"
+    submodules:
+      - "pip install -e methods/disk/submodules/torch-dimcheck"
+      - "pip install -e methods/disk/submodules/torch-localize"
+      - "pip install -e methods/disk/submodules/unets"
 
+ripe:
+  - url: "https://github.com/fraunhoferhhi/RIPE.git"
+    dest: "ripe"
+    commit: "639f6d409736c54a0fe479a3d148d72c3fe9164e"
+    submodules:
+      - "mkdir -p methods/ripe/ckpt"
+      - "wget https://cvg.hhi.fraunhofer.de/RIPE/ripe_weights.pth -P methods/ripe/ckpt"
+
+dedode:
+  - url: "https://github.com/Parskatt/DeDoDe.git"
+    dest: "dedode"
+    commit: "6d156183f4dc84cd704ae779eebc8350995c5b06"
+    submodules:
+      - "mkdir -p methods/dedode/weights"
+      - "wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_B.pth -P methods/dedode/weights"
+      - "wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_descriptor_G.pth -P methods/dedode/weights"
+      - "wget https://github.com/Parskatt/DeDoDe/releases/download/dedode_pretrained_models/dedode_detector_L.pth -P methods/dedode/weights"
+
+aliked:
+  - url: "https://github.com/Shiaoming/ALIKED.git"
+    dest: "aliked"
+    commit: "683d7c65197395c0b3f01ebe76e1084a27e73a65"
+    submodules:
+      - "bash bash/fix_aliked_custom_ops.sh"
+
+sift:
+  - url: null
+    dest: "sift"
+    submodules:
+      - "pip install pycolmap"

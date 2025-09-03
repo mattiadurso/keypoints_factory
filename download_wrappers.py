@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 # wrapper to download files from a URL, empty list means download all
-wrappers_to_download = ['superpoint']
+wrappers_to_download = ['disk']
 
 # load dict with links for download
 with open("download_wrappers.yaml", "r") as f:
@@ -19,12 +19,12 @@ for name in wrappers_source.keys():
         for file_info in wrappers_source[name]:
             url  = file_info["url"]
             dest = file_info["dest"]
+            commit = file_info.get("commit", None)
 
             if url:
-                if 'github' in url:
-                    os.system(f"git clone --recursive {url} methods/{dest}")
-                else:
-                    os.system(f"wget -P methods/{dest} {url}")
+                os.system(f"git clone --recursive {url} methods/{dest}")
+                # if commit: # or just manually check if commit corresponds
+                #     os.system(f"cd methods/{dest} && git checkout {commit}")
 
             if file_info.get("submodules"):
                 for submodule in file_info["submodules"]:
