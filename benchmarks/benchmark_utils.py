@@ -1,6 +1,5 @@
 import warnings
 import numpy as np
-import math
 import cv2
 import torch
 from torchvision import transforms
@@ -9,7 +8,6 @@ import torch.nn.functional as F
 from PIL import Image
 from einops import rearrange
 import torch
-import os
 import random
 from time import perf_counter
 import argparse
@@ -24,26 +22,6 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
         
-# def fix_rng(seed=42):
-#     """  Set seed for reproducibility
-#     """
-#     torch.backends.cudnn.deterministic = True
-#     torch.backends.cudnn.benchmark = False
-#     torch.use_deterministic_algorithms(True, warn_only=True)
-
-#     # torch seed
-#     torch.random.manual_seed(seed)
-#     if torch.cuda.is_available():
-#         torch.cuda.manual_seed(seed)
-#         torch.cuda.manual_seed_all(seed)
-#         torch.cuda.synchronize()
-
-#     # numpy seed
-#     np.random.seed(seed)
-
-#     # random seed
-#     random.seed(seed)
-
 def fix_rng(seed=42):
     """  Set seed for reproducibility
     """

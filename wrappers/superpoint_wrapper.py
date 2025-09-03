@@ -1,7 +1,9 @@
 from __future__ import annotations
-import numpy as np
+
+import sys
+sys.path.append('methods/superpoint')
+
 import torch
-from torch import Tensor
 from torchvision import transforms
 
 from wrappers.wrapper import MethodWrapper, MethodOutput
@@ -20,7 +22,7 @@ class SuperPointWrapper(MethodWrapper):
         self.toGray = transforms.Grayscale()
 
     @ torch.inference_mode()
-    def _extract(self, img: Tensor | np.ndarray, max_kpts: float | int):
+    def _extract(self, img: torch.Tensor, max_kpts: float | int):
         if max_kpts != self.superpoint.config['max_keypoints']:
             self.superpoint.config['max_keypoints'] = max_kpts
             print(f'Updated max_keypoints to {max_kpts}.')

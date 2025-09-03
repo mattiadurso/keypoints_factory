@@ -1,13 +1,10 @@
-from pathlib import Path
 import sys
-import torch
-import numpy as np
-
-
 sys.path.append('methods/aliked')
-from methods.aliked.nets.aliked import ALIKED
 
+import torch
+from methods.aliked.nets.aliked import ALIKED
 from wrappers.wrapper import MethodWrapper, MethodOutput
+
 
 class AlikedWrapper(MethodWrapper):
     def __init__(self, device: str = 'cuda', max_kpts: int = 2048, border=16):

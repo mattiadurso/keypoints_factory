@@ -1,23 +1,11 @@
 import sys
-from pathlib import Path
-
-# Dynamically get the project root directory
 sys.path.append('methods/disk')
 
-from abc import ABC
-from pathlib import Path
-from typing import Union, Tuple
-
-import numpy as np
 import torch 
-from torch import Tensor
 import torch.nn.functional as F
-
 
 from methods.disk.disk import DISK
 from wrappers.wrapper import MethodWrapper, MethodOutput
-
-
 
 class DiskWrapper(MethodWrapper):
     def __init__(self, device: str = 'cuda:0', border=16) -> None:
@@ -38,7 +26,7 @@ class DiskWrapper(MethodWrapper):
     #     # to do
 
     @torch.inference_mode()
-    def _extract(self, img: Tensor, max_kpts: int) -> MethodOutput:
+    def _extract(self, img: torch.Tensor, max_kpts: int) -> MethodOutput:
         with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, enabled=self.use_amp):
             # desc_vol is None if use_disk_descriptors is False
             features = self.disk.features(img[None], kind='nms', window_size=5, cutoff=0, n=max_kpts)

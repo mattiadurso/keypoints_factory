@@ -1,7 +1,5 @@
-from pathlib import Path
 import sys
-file_path = Path(__file__).resolve().parent
-sys.path.append('wrappers/dedode')
+sys.path.append('methods/dedode')
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -9,9 +7,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import gc
 import torch
 from torchvision import transforms
+import torch.nn.functional as F
 
-from wrappers.wrapper import MethodWrapper, MethodOutput
 from methods.dedode.DeDoDe import dedode_detector_L, dedode_descriptor_B, dedode_descriptor_G
+from wrappers.wrapper import MethodWrapper, MethodOutput
 
 class DeDoDeWrapper(MethodWrapper):
     def __init__(self, descriptor_G:bool= False, device: str = 'cuda:0', border=16):
@@ -59,6 +58,7 @@ class DeDoDeWrapper(MethodWrapper):
             if self.custom_descriptor is None:
                 out = self.descriptor.describe_keypoints(batch, kpts)
                 des = out['descriptions'][0]    
+                des = F.normalize(des, p=2, dim=-1)  # L2 normalization, needed since not done in dedode descriptor orginal code
 
             else:  # custom descriptor network
                 des_vol = self.custom_descriptor(x)

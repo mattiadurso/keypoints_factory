@@ -2,11 +2,9 @@ import sys
 sys.path.append('methods/ripe')
 
 import torch
-import numpy as np
 from pathlib import Path
 
-from ripe import vgg_hyper
-
+from methods.ripe import vgg_hyper
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
 class RIPEWrapper(MethodWrapper):

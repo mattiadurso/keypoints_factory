@@ -1,13 +1,12 @@
-from pathlib import Path
-import sys
-import torch
-import numpy as np
-from wrappers.wrapper import MethodWrapper, MethodOutput
-
 # NOT working class
 
-# sys.path.append('methods/method')
-# from methods.method import method
+import sys
+sys.path.append('methods/method')
+import torch
+
+from methods.method import method
+from wrappers.wrapper import MethodWrapper, MethodOutput
+
 
 class ExampleWrapper(MethodWrapper):
     def __init__(self, device: str = 'cuda', max_kpts: int = 2048, border=16):

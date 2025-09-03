@@ -1,9 +1,13 @@
+# This code is based on Parskatt implementation in DeDoDe.
+# source: https://github.com/Parskatt/DeDoDe/blob/main/DeDoDe/benchmarks/mega_pose_est_mnn.py
+
 import os
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
-from pathlib import Path
 import sys
-sys.path.append('/home/mattia/Desktop/Repos/wrapper_factory/')
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # adjust as needed
+sys.path.insert(0, str(PROJECT_ROOT))  # contains the 'methods' package
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -12,10 +16,12 @@ import numpy as np
 import pandas as pd
 import gc
 import torch
-from benchmarks.benchmark_utils import *
+
 from PIL import Image
 from datetime import datetime
 from tqdm.auto import tqdm
+
+from benchmarks.benchmark_utils import *
 from matchers.dual_softmax_matcher import DualSoftMaxMatcher
 from matchers.mnn import MNN
 
@@ -169,11 +175,6 @@ class MegaDepthPoseMNNBenchmark:
 
 
 if __name__ == '__main__':
-    import os
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8" # for reproducibility
-    import torch
-    torch.set_float32_matmul_precision('high')
-
     import json
     import argparse
     from wrappers_manager import wrappers_manager
@@ -215,10 +216,8 @@ if __name__ == '__main__':
                         'spatial_attention': config['model_config']['unet_spatial_attention'],
                         'third_block': config['model_config']['third_block'],
                         }
-        # print('model config for model.pth:', model_config)
 
-        sys.path.append('/home/mattia/Desktop/Repos/strek_reference')
-        from model.network_descriptor import SANDesc
+        from sandesc_models.sandesc.network_descriptor import SANDesc
         network = SANDesc(**model_config).eval().to(device) 
 
         weights = torch.load(custom_desc, weights_only=False)
