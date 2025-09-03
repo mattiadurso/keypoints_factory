@@ -7,7 +7,8 @@ import torch
 from torchvision import transforms
 
 from wrappers.wrapper import MethodWrapper, MethodOutput
-from methods.superpoint.superpoint import SuperPoint
+from methods.superpoint.models.superpoint import SuperPoint
+
 
 class SuperPointWrapper(MethodWrapper):
     def __init__(self, device: str, border=16) -> None:
