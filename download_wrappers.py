@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 # wrapper to download files from a URL
-wrappers_to_download = ['disk']
+wrappers_to_download = ['superpoint']
 
 # load dict with links for download
 with open("download_wrappers.yaml", "r") as f:
