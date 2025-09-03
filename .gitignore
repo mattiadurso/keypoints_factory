@@ -5,3 +5,9 @@ download_test.ipynb
 **/__pycache__/**
 **/*.pth
 methods/*
+**/**/*.csv
+benchmarks/megadepth1500/data/**
+benchmarks/graz_high_res/data/**
+sandesc_models/*
+__bin/*
+nohup.out
