@@ -4,7 +4,7 @@ sys.path.append('methods/ripe')
 import torch
 from pathlib import Path
 
-from methods.ripe import vgg_hyper
+from methods.ripe.ripe import vgg_hyper
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
 class RIPEWrapper(MethodWrapper):
