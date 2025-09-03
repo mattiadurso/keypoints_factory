@@ -18,13 +18,6 @@ class DiskWrapper(MethodWrapper):
 
         self.disk = disk.to(device)
 
-    # def add_custom_descriptors(self, model):
-    #     self.custom_descriptor = model
-    #     self.prune_descriptors()
-
-    # def prune_descriptors(self):
-    #     # to do
-
     @torch.inference_mode()
     def _extract(self, img: torch.Tensor, max_kpts: int) -> MethodOutput:
         with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, enabled=self.use_amp):

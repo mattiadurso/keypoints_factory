@@ -1,22 +1,7 @@
-from pathlib import Path
-import sys
-file_path = Path(__file__).resolve().parent
-sys.path.append(str(file_path))
-sys.path.append(str(file_path.parent))  # Add parent directory to sys.path
-
-import gc
-import numpy as np
-from typing import Union, List
-
-# pycolmap
-import pycolmap as pcm
-
-# Torch only used for input compatibility with your existing code
 import torch
-from torch import Tensor
+import numpy as np
 
-# Your utils
-from libutils.utils_2D import grid_sample_nan  # unused here but kept for interface parity
+import pycolmap as pcm
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
 class SIFTPyColmapWrapper(MethodWrapper):
@@ -26,6 +11,7 @@ class SIFTPyColmapWrapper(MethodWrapper):
         sift_opts: dict of pycolmap.SiftExtractionOptions fields (optional)
         """
         super().__init__(name='sift', border=border, device=device)
+        print(f'By default, SIFT uses CPU even if CUDA is available. To use GPU, install pycolmap with CUDA support.') #https://colmap.github.io/pycolmap/index.html
 
         # Build SIFT options (defaults are good; expose a dict for tweaks)
         if sift_opts is None:
@@ -34,7 +20,7 @@ class SIFTPyColmapWrapper(MethodWrapper):
         self.sift = pcm.Sift(self.options, device=pcm.Device.auto)
 
 
-    def _to_gray_uint8(self, img_chw: Tensor) -> np.ndarray:
+    def _to_gray_uint8(self, img_chw: torch.Tensor) -> np.ndarray:
         """
         Convert a torch CHW float tensor in [0,1] or [0,255] to HxW uint8 grayscale.
         Accepts either 1xHxW or 3xHxW.
