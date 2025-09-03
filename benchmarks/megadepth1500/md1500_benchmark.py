@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
 from pathlib import Path
 import sys
 sys.path.append('/home/mattia/Desktop/Repos/wrapper_factory/')

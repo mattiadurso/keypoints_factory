@@ -12,6 +12,37 @@ import torch
 import os
 import random
 from time import perf_counter
+import argparse
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+        
+# def fix_rng(seed=42):
+#     """  Set seed for reproducibility
+#     """
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+#     torch.use_deterministic_algorithms(True, warn_only=True)
+
+#     # torch seed
+#     torch.random.manual_seed(seed)
+#     if torch.cuda.is_available():
+#         torch.cuda.manual_seed(seed)
+#         torch.cuda.manual_seed_all(seed)
+#         torch.cuda.synchronize()
+
+#     # numpy seed
+#     np.random.seed(seed)
+
+#     # random seed
+#     random.seed(seed)
 
 def fix_rng(seed=42):
     """  Set seed for reproducibility
@@ -20,18 +51,26 @@ def fix_rng(seed=42):
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True, warn_only=True)
 
-    # torch seed
-    torch.random.manual_seed(seed)
+    # optional: turn off TF32 to avoid tiny nondet diffs on Ampere+
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+
+    # If you use scaled_dot_product_attention, force the math kernel (deterministic)
+    try:
+        from torch.backends.cuda import sdp_kernel
+        sdp_kernel.enable_flash(False)
+        sdp_kernel.enable_mem_efficient(False)
+        sdp_kernel.enable_math(True)
+    except Exception:
+        pass
+
+    torch.manual_seed(seed)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
         torch.cuda.synchronize()
-
-    # numpy seed
     np.random.seed(seed)
-
-    # random seed
     random.seed(seed)
+
 
 
 def parse_pair(pair):
