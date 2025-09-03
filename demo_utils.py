@@ -1,18 +1,145 @@
 import sys
 sys.path.append('../')
 import torch
+import kornia
 import time
 import numpy as np
-import glob
 import matplotlib.pyplot as plt
 import random
 import cv2
-import pydegensac
 from copy import deepcopy
 
-from libutils_md.conversions import to_torch
-from libutils_md.geometry import compute_epipolar_lines_coeff
-from libutils_md.projections import  distance_line_points_parallel
+from typing import Union
+TensorOrArray = Union[torch.Tensor, np.ndarray]
+
+
+def unproject_points2d(points, K, remove_last=True):
+    """
+    Unproject 2D points to 3D points.
+    """
+    points = to_torch(points, b=False)
+    K = to_torch(K, b=False)
+
+    points = to_homogeneous(points)
+    points_unprojected = (K.inverse() @ points.permute(-1,-2)).permute(-1,-2) # K^-1 != K.T
+
+    if remove_last:
+        points_unprojected = points_unprojected[:,:2] / points_unprojected[:,2:]
+        return points_unprojected.reshape(-1,2)
+    
+    points_unprojected = points_unprojected / points_unprojected[:,2:]
+    return points_unprojected.reshape(-1,3)
+
+
+
+def to_homogeneous(vector):
+    """
+    Convert a 2D vector to homogeneous coordinates.
+    """
+    vector = to_torch(vector, b=False)
+    if vector.shape[1] == 2:
+        vector = torch.hstack([vector, torch.ones_like(vector)[...,:1]])
+    return vector.float()
+
+
+def compute_epipolar_lines_coeff(
+        E: TensorOrArray, # bx3x3
+        points: TensorOrArray, # bxNx2
+        K=None,  # bx3x3
+        ):# :# -> tuple[Tensor, Tensor]: # bx3x3, bx3x1
+    """
+    Compute the epipolar lines coefficients from the essential/fundamental matrix and the points. 
+    It is needed to unproject points if using the Essetial matrix.
+    Args:
+        E: essential matrix
+        points: points in the image
+        K: intrinsics matrix. If not provide E is assumed to be the fundamental matrix.
+    Returns:
+        epi_lines: epipolar lines coefficients  
+    """
+    points = to_torch(points, b=False)
+    E = to_torch(E, b=False)[0]
+    if K is not None:
+        K = to_torch(K, b=False)
+
+    if K is not None:
+        points = unproject_points2d(points, K, remove_last=False)
+    else:
+        points = to_homogeneous(points)
+
+    return (E @ points.T).T # epipolar coefficients [a,b,c] for each point
+
+def distance_line_points_parallel(line, points):
+    """
+    line: tensor [1,3], [3], [3,1]
+    points: tensor [N,2]
+    """
+    a,b,c = line.flatten()
+    x,y = points[:,0], points[:,1]
+    return torch.abs(a*x+b*y+c)/(a**2+b**2)**.5
+
+
+def is_torch(vector):
+    """
+    Check if a vector is a torch tensor.
+    """
+    if isinstance(vector, torch.Tensor):
+        return True
+    else:
+        return False
+
+
+def to_torch(vector_, b=True):
+    """
+    Convert a numpy array to a torch tensor. Eventually add batch size.
+    """
+    vector = deepcopy(vector_)
+    if not is_torch(vector):
+        vector =  torch.tensor(vector)
+
+    if b and len(vector.shape) < 3:
+        vector = vector.unsqueeze(0)
+    
+    return vector.float()
+
+def compute_fundamental_from_relative_motion(R,t,K0,K1):
+    """
+    Compute the fundamental matrix from the relative rotation and translation.
+    Args:
+        R: relative rotation matrix
+        t: relative translation vector
+        K0: intrinsics matrix of image 0
+        K1: intrinsics matrix of image 1
+    Returns:
+        Fm: fundamental matrix
+    """
+    R, t = to_torch(R), to_torch(t, b=False)
+    K0, K1 = to_torch(K0, b=True), to_torch(K1, b=True)
+    Em = compute_essential_from_relative_motion(R,t)
+    Fm = torch.bmm(K1.permute(0,2,1).inverse(), torch.bmm(Em, K0.inverse()))
+    return Fm
+
+
+def compute_essential_from_relative_motion(R,t):
+    """
+    Compute the essential matrix from the relative rotation and translation.
+    Args:
+        R: relative rotation matrix
+        t: relative translation vector
+    Returns:
+        Em: essential matrix
+    """
+    R = to_torch(R)
+    t = to_torch(t, b=False)
+
+    if R.shape[-1] == 4:
+        # its a quaternion
+        R = kornia.geometry.conversions.quaternion_to_rotation_matrix(R)
+
+    Tx = kornia.geometry.conversions.vector_to_skew_symmetric_matrix(t)
+    Em = Tx @ R
+
+    return Em
 
 
 
@@ -29,7 +156,7 @@ def geom_verification(kpts1_matched,kpts2_matched, max_iter=200_000):
     # Configure other parameters as needed
     usac_params.confidence = 0.999999
     usac_params.maxIterations = max_iter
-    usac_params.threshold = 1.0  # Adjust based on your data
+    usac_params.threshold = 3.0  # Adjust based on your data
     usac_params.loMethod = cv2.LOCAL_OPTIM_SIGMA
     usac_params.score = cv2.SCORE_METHOD_MAGSAC
     usac_params.sampler = cv2.SAMPLING_UNIFORM
@@ -62,7 +189,7 @@ def plot_imgs(images, titles=None, rows=1):
     cols = -(-len(images) // rows)  # Ceiling division to handle uneven grids
 
     # Create subplots
-    fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
+    fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 5 * rows))
 
     # Flatten axes for easy iteration, in case rows or cols == 1
     axes = axes.flatten() if rows > 1 or cols > 1 else [axes]
@@ -92,8 +219,8 @@ def plot_imgs(images, titles=None, rows=1):
     plt.show()
 
 
-def plot_imgs_and_kpts(img1, img2, kpt1, kpt2, space=25, matches=True,  index=False, sample_points=32, pad=False, figsize=(15, 10), axis=True, scatter=True,
-                       highlight_bad_matches=None, F_gt=None, plot_name=None):
+def plot_imgs_and_kpts(img1, img2, kpt1, kpt2, space=100, matches=True,  index=False, sample_points=32, pad=False, figsize=(10, 5), axis=True, scatter=True,
+                       highlight_bad_matches=None, F_gt=None, plot_name=None, reth=5):
     """
     Plot two images side by side with keypoints overlayed and matches if specified.
     """
@@ -184,18 +311,21 @@ def plot_imgs_and_kpts(img1, img2, kpt1, kpt2, space=25, matches=True,  index=Fa
 
             repr_err_A = [distance_line_points_parallel(epilines_A[i], points2[i][None]).item() for i in range(epilines_A.shape[0])]
             repr_err_B = [distance_line_points_parallel(epilines_B[i], points1[i][None]).item() for i in range(epilines_B.shape[0])]
-            print('median reprojection error A:', np.median(repr_err_A))
-            print('median reprojection error B:', np.median(repr_err_B))
+            # print('median reprojection error A:', np.median(repr_err_A))
+            # print('median reprojection error B:', np.median(repr_err_B))
 
-            th = 5
-            good_matches = (torch.tensor(repr_err_A) <= th) & (torch.tensor(repr_err_B) <= th)
+            reth = 5
+            good_matches = (torch.tensor(repr_err_A) <= reth) & (torch.tensor(repr_err_B) <= reth)
 
             kpts1_matched_good = kpt1[good_matches]
             kpts2_matched_good = kpt2[good_matches]
 
             kpts1_matched_bad = kpt1[~good_matches]
             kpts2_matched_bad = kpt2[~good_matches]
-            print('Matches good:', kpts1_matched_good.shape[0], 'Matches bad:', kpts1_matched_bad.shape[0])
+            print(f'Reprojection error threshold: {reth} pixels')
+            print('Good matches:', kpts1_matched_good.shape[0])
+            print('Bad matches: ', kpts1_matched_bad.shape[0])
+            
 
             for i in range(kpts1_matched_good.shape[0]):
                 plt.plot([kpts1_matched_good[i, 0], kpts2_matched_good[i, 0] + img1.shape[1] + space], [kpts1_matched_good[i, 1], kpts2_matched_good[i, 1]], c="g", linewidth=1, alpha=0.85)
