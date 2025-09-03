@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 
 
-# wrapper to download files from a URL
+# wrapper to download files from a URL, empty list means download all
 wrappers_to_download = ['superpoint']
 
 # load dict with links for download
