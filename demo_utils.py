@@ -12,7 +12,6 @@ from copy import deepcopy
 from typing import Union
 TensorOrArray = Union[torch.Tensor, np.ndarray]
 
-
 def unproject_points2d(points, K, remove_last=True):
     """
     Unproject 2D points to 3D points.
@@ -29,7 +28,6 @@ def unproject_points2d(points, K, remove_last=True):
     
     points_unprojected = points_unprojected / points_unprojected[:,2:]
     return points_unprojected.reshape(-1,3)
-
 
 
 def to_homogeneous(vector):
@@ -69,6 +67,7 @@ def compute_epipolar_lines_coeff(
 
     return (E @ points.T).T # epipolar coefficients [a,b,c] for each point
 
+
 def distance_line_points_parallel(line, points):
     """
     line: tensor [1,3], [3], [3,1]
@@ -101,6 +100,7 @@ def to_torch(vector_, b=True):
         vector = vector.unsqueeze(0)
     
     return vector.float()
+
 
 def compute_fundamental_from_relative_motion(R,t,K0,K1):
     """
@@ -142,8 +142,7 @@ def compute_essential_from_relative_motion(R,t):
     return Em
 
 
-
-def geom_verification(kpts1_matched,kpts2_matched, max_iter=200_000):
+def geom_verification(kpts1_matched, kpts2_matched, max_iter=200_000):
     random.seed(42)
     np.random.seed(42)
 
@@ -171,7 +170,6 @@ def geom_verification(kpts1_matched,kpts2_matched, max_iter=200_000):
     kpts1_matched = kpts1_matched[inlier_mask]
     kpts2_matched = kpts2_matched[inlier_mask]
     print('geom. verified:', inlier_mask.sum(), end='\n\n')
-
 
     return kpts1_matched, kpts2_matched, F  
 
@@ -323,8 +321,7 @@ def plot_imgs_and_kpts(img1, img2, kpt1, kpt2, space=100, matches=True,  index=F
             kpts1_matched_bad = kpt1[~good_matches]
             kpts2_matched_bad = kpt2[~good_matches]
             print(f'Reprojection error threshold: {reth} pixels')
-            print('Good matches:', kpts1_matched_good.shape[0])
-            print('Bad matches: ', kpts1_matched_bad.shape[0])
+            print(f'Inliers: {kpts1_matched_good.shape[0]}/{kpt1.shape[0]}')
             
 
             for i in range(kpts1_matched_good.shape[0]):
