@@ -21,6 +21,7 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+    
         
 def fix_rng(seed=42):
     """  Set seed for reproducibility
@@ -50,7 +51,6 @@ def fix_rng(seed=42):
     random.seed(seed)
 
 
-
 def parse_pair(pair):
     parts = pair.strip().split()
     img1, img2 = parts[0], parts[1]
@@ -71,6 +71,7 @@ def parse_pair(pair):
     # return img1, img2, K1, K2, R, t, E, F
 
     return img1, img2, K1, K2, R, t
+
 
 def print_metrics(wrapper, metrics: dict):
     print(f"\nEvaluation results for {wrapper.name}:")
@@ -107,7 +108,6 @@ def recover_pose(E, kpts0, kpts1, K0, K1, mask):
             best_num_inliers = n
             ret = (R, t, mask.ravel() > 0)
     return ret
-
 
 
 # Code taken from https://github.com/PruneTruong/DenseMatching/blob/40c29a6b5c35e86b9509e65ab0cd12553d998e5f/validation/utils_pose_estimation.py
@@ -273,6 +273,7 @@ def jacobi_determinant(warp, certainty, R = 3, device = get_best_device(), dtype
 
     return robust_abs_J_logdet
 
+
 def get_gt_warp(depth1, depth2, T_1to2, K1, K2, depth_interpolation_mode = 'bilinear', relative_depth_error_threshold = 0.05, H = None, W = None):
     
     if H is None:
@@ -302,6 +303,7 @@ def get_gt_warp(depth1, depth2, T_1to2, K1, K2, depth_interpolation_mode = 'bili
         prob = mask.float().reshape(B, H, W)
         x2 = x2.reshape(B, H, W, 2)
         return torch.cat((x1_n.reshape(B,H,W,2),x2),dim=-1), prob
+
 
 def unnormalize_coords(x_n,h,w):
     x = torch.stack(
@@ -335,6 +337,7 @@ def rotate_pose_inplane(i_T_w, rot):
 def scale_intrinsics(K, scales):
     scales = np.diag([1.0 / scales[0], 1.0 / scales[1], 1.0])
     return np.dot(scales, K)
+
 
 def angle_error_mat(R1, R2):
     cos = (np.trace(np.dot(R1.T, R2)) - 1) / 2
