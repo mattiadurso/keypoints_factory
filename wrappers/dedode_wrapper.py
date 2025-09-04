@@ -35,6 +35,7 @@ class DeDoDeWrapper(MethodWrapper):
         self.custom_descriptor = model
         # clean up
         self.descriptor = None
+        self.descriptor_G = False
         gc.collect()
         torch.cuda.empty_cache()
 
