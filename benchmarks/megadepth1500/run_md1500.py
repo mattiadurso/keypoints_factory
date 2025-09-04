@@ -2,8 +2,8 @@ import os
 import glob
 from pathlib import Path
 
+wrappers_list = ['aliked', 'disk', 'superpoint', 'ripe', 'dedode', 'dedode-G'] # 'aliked', 'disk', 'superpoint', 'ripe', 'dedode', 'dedode-G'
 
-wrappers_list = ['dedode', 'dedode-G'] 
 # common parameters
 matcher= 'mnn' # default: "dual_softmax" 
 script_name = 'benchmarks/megadepth1500/md1500_benchmark.py'
@@ -20,9 +20,9 @@ for wrapper in wrappers_list:
     os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
         --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats}')
 
-    # os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-    #     --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} \
-    #     --custom-desc sandesc_models/{wrapper}/final.pth')
+    os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
+        --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} \
+        --custom-desc sandesc_models/{wrapper}/final.pth')
 
 
 # --------------------- Kpts budget: 30 000 ------------------------------
@@ -33,9 +33,9 @@ for wrapper in wrappers_list:
     os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
         --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats}')
 
-    # os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-    #     --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} \
-    #     --custom-desc sandesc_models/{wrapper}/final.pth')
+    os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
+        --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} \
+        --custom-desc sandesc_models/{wrapper}/final.pth')
 
 
 

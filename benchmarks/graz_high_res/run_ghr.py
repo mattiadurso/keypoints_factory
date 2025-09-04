@@ -2,7 +2,7 @@ import os
 import glob
 from pathlib import Path
 
-wrappers_list = ['ripe'] # 'aliked', 'disk', 'superpoint', 'ripe', 'dedode', 
+wrappers_list = ['aliked', 'disk', 'superpoint', 'ripe', 'dedode', 'dedode-G'] # 'aliked', 'disk', 'superpoint', 'ripe', 'dedode', 'dedode-G'
 
 # common parameters
 matcher= 'mnn' 
@@ -14,29 +14,19 @@ partial = False
 tag = None
 
 # scale factor
-scale_factors = {'4K': 1, 'QHD': 1.5, 'FHD': 2, 'HD': 3}
-resolutions = ['QHD']  # '4K', 'QHD', 'FHD', 'HD'
+scale_factors = {'4K': 1, 'QHD': 1.5, 'FHD': 2} # 'HD': 3, this would be more similar to md1500 resolution
+resolutions = ['4K', 'QHD', 'FHD']  # '4K', 'QHD', 'FHD'
 
 # --------------------- Kpts budget: 2048 -------------------------------
 max_kpts = 2048
 th = 0.75
 
-# for s in resolutions:
-#     for wrapper in wrappers_list:
-#         os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-#             --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor {scale_factors[s]}')
+for s in resolutions:
+    for wrapper in wrappers_list:
+        os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
+            --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor {scale_factors[s]}')
 
-#         os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-#             --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor {scale_factors[s]} \
-#             --custom-desc sandesc_models/{wrapper}/final.pth')
+        os.system(f'python {script_name} --wrapper-name {wrapper} --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
+            --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor {scale_factors[s]} \
+            --custom-desc sandesc_models/{wrapper}/final.pth')
 
-os.system(f'python {script_name} --wrapper-name dedode --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-    --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor 2')
-
-os.system(f'python {script_name} --wrapper-name dedode-G --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-    --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor 2')
-
-# todo
-os.system(f'python {script_name} --wrapper-name dedode --max-kpts {max_kpts} --matcher {matcher} --run-tag {tag} \
-    --th {th} --min-score {min_score} --ratio-test {ratio_test} --stats {stats} --partial {partial} --scale-factor 1.5 \
-    --custom-desc sandesc_models/dedode/final.pth')
