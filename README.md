@@ -75,7 +75,7 @@ Here below we report the results when running the benchmarks. We include also re
 | DeDoDe-G      | **46.4**     | **63.2**      | **55.3**    | **70.9**     |
 | ↳ w/ SANDesc  | 45.2         | 61.8          | 52.8        | 67.2         |
 
-### HRB Results (2048 keypoints)
+### Graz High Resolution Benchmark Results (2048 keypoints)
 
 | Method        | AUC@5 (FHD) | AUC@5 (QHD) | AUC@5 (4K) | AUC@10 (FHD) | AUC@10 (QHD) | AUC@10 (4K) |
 |---------------|-------------|-------------|------------|--------------|--------------|-------------|
