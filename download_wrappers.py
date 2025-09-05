@@ -2,7 +2,7 @@ import os
 import yaml
 
 # wrapper to download files from a URL, empty list means download all
-wrappers_to_download = ['disk']
+wrappers_to_download = []
 
 # load dict with links for download
 with open("download_wrappers.yaml", "r") as f:
