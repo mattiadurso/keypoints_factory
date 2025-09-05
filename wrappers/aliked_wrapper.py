@@ -1,7 +1,9 @@
 import sys
+import torch
+
+# Add method-specific path before importing from it
 sys.path.append('methods/aliked')
 
-import torch
 from methods.aliked.nets.aliked import ALIKED
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
@@ -18,20 +20,23 @@ class AlikedWrapper(MethodWrapper):
         ).eval().to(device)
 
     @torch.inference_mode()
-    def _extract(self, x, max_kpts: int=2048) -> MethodOutput:
-        # Aliked asked for max kpts to be set during initialization, 
-        # in this way it's possible to change it in any moment
+    def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
+        # Aliked requires max kpts to be set during initialization,
+        # this allows changing it at any moment
         if self.max_kpts != max_kpts:
             custom_descriptor = self.custom_descriptor
-            self.__init__(device=self.device, max_kpts=max_kpts, border=self.border)
+            self.__init__(device=self.device, max_kpts=max_kpts,
+                         border=self.border)
             self.custom_descriptor = custom_descriptor
-        
+
         x = x if x.dim() == 4 else x[None]
 
-        with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, enabled=self.use_amp):
+        with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype,
+                               enabled=self.use_amp):
             if self.custom_descriptor is None:
                 out = self.aliked(x)
-                kpts, scores, des = out['keypoints'][0], out['scores'][0], out['descriptors'][0]
+                kpts, scores, des = (out['keypoints'][0], out['scores'][0],
+                                   out['descriptors'][0])
                 kpts = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
 
             else:
@@ -41,7 +46,7 @@ class AlikedWrapper(MethodWrapper):
 
                 des_vol = self.custom_descriptor(x)
                 kpts = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
-                des = self.grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
+                des = self.grid_sample_nan(kpts[None], des_vol,
+                                           mode='nearest')[0][0].T
 
         return MethodOutput(kpts=kpts, kpts_scores=scores, des=des)
-

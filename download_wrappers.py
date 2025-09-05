@@ -1,7 +1,5 @@
-import os 
+import os
 import yaml
-from pathlib import Path
-
 
 # wrapper to download files from a URL, empty list means download all
 wrappers_to_download = ['disk']
@@ -17,7 +15,7 @@ os.makedirs("methods", exist_ok=True)
 for name in wrappers_source.keys():
     if name in wrappers_to_download or len(wrappers_to_download) == 0:
         for file_info in wrappers_source[name]:
-            url  = file_info["url"]
+            url = file_info["url"]
             dest = file_info["dest"]
             commit = file_info.get("commit", None)
 

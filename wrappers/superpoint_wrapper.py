@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import sys
-sys.path.append('methods/superpoint')
-
 import torch
 from torchvision import transforms
+
+sys.path.append('methods/superpoint')
 
 from wrappers.wrapper import MethodWrapper, MethodOutput
 from methods.superpoint.models.superpoint import SuperPoint
@@ -14,12 +14,12 @@ class SuperPointWrapper(MethodWrapper):
     def __init__(self, device: str, border=16) -> None:
         super().__init__(name='SuperPoint', border=border, device=device)
         config = {
-            "keypoint_threshold": -1, # min score, -1 to disable
+            "keypoint_threshold": -1,  # min score, -1 to disable
             "max_keypoints": 2048,
         }
         self.superpoint = SuperPoint(config).to(device)
         self.superpoint.requires_grad_(False)
-        
+
         self.toGray = transforms.Grayscale()
 
     @ torch.inference_mode()
@@ -45,11 +45,12 @@ class SuperPointWrapper(MethodWrapper):
 
             if self.custom_descriptor is not None:
                 des_vol = self.custom_descriptor(img[None])
-                descriptors = self.grid_sample_nan(kpts[None], des_vol, mode='nearest')[0][0].T
+                descriptors = self.grid_sample_nan(kpts[None], des_vol,
+                                                   mode='nearest')[0][0].T
             else:
-                descriptors = output['descriptors'][0].permute(1, 0) # N,256
+                descriptors = output['descriptors'][0].permute(1, 0)  # N,256
                 descriptors = descriptors[idxs]
-        
+
         output = MethodOutput(
             kpts=kpts,
             kpts_scores=kpts_scores,

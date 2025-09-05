@@ -12,27 +12,35 @@ sys.path.insert(0, str(PROJECT_ROOT))  # contains the 'methods' package
 import warnings
 warnings.filterwarnings("ignore")
 
+import gc
 import glob
 import numpy as np
 import pandas as pd
-import gc
 import torch
-from benchmarks.benchmark_utils import *
 from PIL import Image
 from datetime import datetime
 from tqdm.auto import tqdm
-from matchers.dual_softmax_matcher import DualSoftMaxMatcher
 from matchers.mnn import MNN
+from benchmarks.benchmark_utils import (
+    str2bool,
+    fix_rng,
+    print_metrics,
+    estimate_pose,
+    compute_pose_error,
+    compute_relative_pose,
+    pose_auc
+)
 
-DATASET_PATH  = Path('benchmarks/graz_high_res/data/') 
+DATASET_PATH = Path('benchmarks/graz_high_res/data/')
 if not DATASET_PATH.exists():
     exit('Dataset not found')
 
+
 class GrazHighResMNNBenchmark:
-    def __init__(self, DATASET_PATH=DATASET_PATH, th = 0.5,
-                 min_score: float = -1.0, ratio_test: float = 1.0, 
-                 max_kpts = 2048, matcher = 'mnn', partial: bool = False
-                ) -> None:
+    def __init__(self, DATASET_PATH=DATASET_PATH, th=0.5,
+                 min_score: float = -1.0, ratio_test: float = 1.0,
+                 max_kpts: int = 2048, partial: bool = False
+                 ) -> None:
         '''
         Args:
             DATASET_PATH: path to the dataset
@@ -49,68 +57,60 @@ class GrazHighResMNNBenchmark:
         min_matches = 100
         max_matches = 1000
         self.partial = partial
-        
+
         pairs_path = 'benchmarks/graz_high_res/data/pairs.npy'
         if Path(pairs_path).exists():
             self.scenes = np.load(pairs_path, allow_pickle=True).item()
         else:
             print(f'No pairs.npy found in {pairs_path}, generating pairs from viewgraph_30.txt')
             self.scenes = {}
-            for scene_name in os.listdir(DATASET_PATH) :
+            for scene_name in os.listdir(DATASET_PATH):
                 if not os.path.isdir(DATASET_PATH/scene_name):
                     continue
                 with open(f"{DATASET_PATH}/{scene_name}/colmap/viewgraph_30.txt", 'r') as f:
-                    lines = f.readlines() # [[img1, img2, num of matches], ...]
-                
+                    lines = f.readlines()  # [[img1, img2, num of matches], ...]
+
                 scene = np.array([line.split() for line in lines])
                 matches = np.array(scene)[:, 2].astype(int) 
                 sampling = np.zeros_like(matches, dtype=bool)
                 sampling[::sample_rate] = True
                 mask = (matches > min_matches) & (matches < max_matches) & sampling # covers almost all images
-                scene = scene[mask, :2] # number of matches not needed anymore
+                scene = scene[mask, :2]  # number of matches not needed anymore
                 self.scenes[scene_name] = scene
-            
+
             # sort by number of pairs
             self.scenes = dict(sorted(self.scenes.items(), key=lambda item: len(item[1]), reverse=False))
             np.save(pairs_path, self.scenes)
             print(f'Pairs saved to {pairs_path}')
 
         if self.partial:
-            k = list(self.scenes.keys())[partial_scene_id] # only one scene for partial benchmarking
-            self.scenes = {k: self.scenes[k]} # only one small scene for quick benchmarking
-        
+            k = list(self.scenes.keys())[partial_scene_id]  # only one scene for partial benchmarking
+            self.scenes = {k: self.scenes[k]}  # only one small scene for quick benchmarking
+
         # Set the parameters
         self.data_root = Path(DATASET_PATH)
         self.max_kpts = max_kpts
         self.th = th
 
         # load matcher
-        if matcher == 'mnn':
-            self.matcher = MNN(min_score=min_score, ratio_test=ratio_test)
-            self.matcher.name = 'mnn'
-        elif matcher == 'dual_softmax':
-            self.matcher = DualSoftMaxMatcher()
-            self.matcher.name = 'dual_softmax'
-        else:
-            raise ValueError("Matcher not supported")
-        
+        self.matcher = MNN(min_score=min_score, ratio_test=ratio_test)
+
         # printing stats
         pairs = [scene for scene in self.scenes.values()]
-        total_pairs = np.vstack(pairs) 
+        total_pairs = np.vstack(pairs)
         total_images = np.unique(total_pairs.flatten())
         total_frames = len(glob.glob(f"{DATASET_PATH}/*/frames/*/*.jpg"))
 
         print(f'Scenes: {", ".join(list(self.scenes.keys()))}\n')
         print(f'Total pairs: {len(total_pairs):,}')
-        print(f'Total images: {len(total_images):,}/{total_frames:,} '+\
+        print(f'Total images: {len(total_images):,}/{total_frames:,} ' +
               f'({100*len(total_images)/total_frames:.2f}%)')
-        
 
     @torch.inference_mode()
     def benchmark(self, wrapper, factor=1, save_stats=True):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         fix_rng()
-        
+
         tot_e_t, tot_e_R, tot_e_pose, inlier = [], [], [], []
         thresholds = [5, 10, 20]
         stats_df = {}
@@ -145,7 +145,7 @@ class GrazHighResMNNBenchmark:
                     continue
 
                 if factor != 1:
-                    W1, H1 = img_A.size        
+                    W1, H1 = img_A.size
                     W2, H2 = img_B.size
                     img_A = img_A.resize((int(W1/factor), int(H1/factor)))
                     img_B = img_B.resize((int(W2/factor), int(H2/factor)))
@@ -170,24 +170,18 @@ class GrazHighResMNNBenchmark:
                     # torch.cuda.empty_cache()
 
                 # matcher
-                if self.matcher.name == 'mnn':
-                    matches = self.matcher.match([description_A], [description_B])[0].matches
-                    kpts1 = keypoints_A[matches[:, 0]]
-                    kpts2 = keypoints_B[matches[:, 1]]
+                matches = self.matcher.match([description_A], [description_B])[0].matches
+                kpts1 = keypoints_A[matches[:, 0]]
+                kpts2 = keypoints_B[matches[:, 1]]
 
-                elif self.matcher.name == 'dual_softmax':
-                    kpts1, kpts2, _ = self.matcher.match(
-                        keypoints_A[None], description_A[None],
-                        keypoints_B[None], description_B[None],
-                        normalize = True, inv_temp=20, threshold = 0.01)
-                
                 # Pose Estimation
-                shuffling = np.random.permutation(np.arange(len(kpts1))) # ?
+                shuffling = np.random.permutation(np.arange(len(kpts1)))
                 kpts1 = kpts1[shuffling]
                 kpts2 = kpts2[shuffling]
                 try:
                     threshold = self.th
-                    norm_threshold = threshold / (np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2])))
+                    norm_threshold = threshold / (np.mean(np.abs(K1[:2, :2])) +
+                                                  np.mean(np.abs(K2[:2, :2])))
                     R_est, t_est, mask = estimate_pose(
                         kpts1.cpu().numpy(),
                         kpts2.cpu().numpy(),
@@ -195,12 +189,12 @@ class GrazHighResMNNBenchmark:
                         K2,
                         norm_threshold,
                         conf=0.99999,
-                    ) # None if no pose is found
+                    )  # None if no pose is found
 
                     T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)  
                     e_t, e_R = compute_pose_error(T1_to_2_est, R, t)
                     e_pose = max(e_t, e_R)
-                    e_pose = 180 if e_pose > 10 else e_pose # added. this follows IMC21 protocol
+                    e_pose = 180 if e_pose > 10 else e_pose  # cap at 10 degrees, even though it impact only AUC20
                     num_inliers = np.sum(mask)
 
                 except Exception as e:
@@ -215,26 +209,28 @@ class GrazHighResMNNBenchmark:
 
                 if save_stats:
                     stats_df[f'{scene_name}_{pair_id}'] = {
-                        'img1': img1_name, 'img2': img2_name, 
-                        'scene_name': scene_name, 
-                        'e_t': e_t, 'e_R': e_R, 'e_pose': e_pose, 
+                        'img1': img1_name, 'img2': img2_name,
+                        'scene_name': scene_name,
+                        'e_t': e_t, 'e_R': e_R, 'e_pose': e_pose,
                         'num_inliers': num_inliers
                         }
 
                 # gc.collect()
                 # torch.cuda.empty_cache()
-        
+
         # stats to csv and save
-        if save_stats:            
+        if save_stats:
             stats_df = pd.DataFrame.from_dict(stats_df, orient='index')
-            path = Path(f'benchmarks/graz_high_res/stats')
+            path = Path('benchmarks/graz_high_res/stats')
             os.makedirs(path, exist_ok=True)
-            stats_df.to_csv(path/f'{wrapper.name}_stats_scale_{scale_factor}_{"partial" if self.partial is True else "full"}_{timestamp}.csv', index=False)
-            
+            stats_df.to_csv(path/f'{wrapper.name}_stats_scale_{scale_factor}_\
+                            {"partial" if self.partial is True else "full"}_\
+                            {timestamp}.csv', index=False)
+
         # Compute the metrics
         tot_e_pose = np.array(tot_e_pose)
         auc = pose_auc(tot_e_pose, thresholds)
-        acc_5  = (tot_e_pose < 5).mean()
+        acc_5 = (tot_e_pose < 5).mean()
         acc_10 = (tot_e_pose < 10).mean()
         acc_20 = (tot_e_pose < 20).mean()
         map_5 = acc_5
@@ -255,7 +251,7 @@ class GrazHighResMNNBenchmark:
 if __name__ == '__main__':
     import json
     import argparse
-    from wrappers_manager import wrappers_manager 
+    from wrappers_manager import wrappers_manager
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda')
@@ -264,12 +260,13 @@ if __name__ == '__main__':
     parser.add_argument('--ratio-test', type=float, default=1.0)
     parser.add_argument('--min-score', type=float, default=-1.0)
     parser.add_argument('--max-kpts', type=int, default=2048)
-    parser.add_argument('--matcher', type=str, default='mnn')
-    parser.add_argument('--th', type=float, default=0.75) 
-    parser.add_argument('--custom-desc', type=str, default=None, help='Path to custom descriptor model')
+    parser.add_argument('--th', type=float, default=0.75)
+    parser.add_argument('--custom-desc', type=str, default=None,
+                        help='Path to custom descriptor model')
     parser.add_argument('--stats', type=str2bool, default=False)
     parser.add_argument('--partial', type=str2bool, default=False)
-    parser.add_argument('--scale-factor', type=float, default=1, help='Scale factor for resizing images. Default 1 is 4K.')
+    parser.add_argument('--scale-factor', type=float, default=1,
+                        help='Scale factor for resizing images. Default 1 is 4K.')
     args = parser.parse_args()
 
     # Set the parameters
@@ -279,7 +276,6 @@ if __name__ == '__main__':
     min_score = args.min_score
     max_kpts = args.max_kpts
     th = args.th
-    matcher = args.matcher
     partial = args.partial
     scale_factor = args.scale_factor
     custom_desc = args.custom_desc
@@ -287,7 +283,7 @@ if __name__ == '__main__':
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
 
-    if custom_desc is not None: # & it is a SANDesc model
+    if custom_desc is not None:  # & it is a SANDesc model
         weights = torch.load(custom_desc, weights_only=False)
         config = weights['config']
         model_config = {'ch_in': config['model_config']['unet_ch_in'],
@@ -299,10 +295,9 @@ if __name__ == '__main__':
                         'third_block': config['model_config']['third_block'],
                         }
 
-        sys.path.append('/home/mattia/Desktop/Repos/strek_reference')  # Add model to path
-        from model.network_descriptor import SANDesc
+        from sandesc_models.sandesc.network_descriptor import SANDesc
         network = SANDesc(
-                    ch_in=model_config['ch_in'], 
+                    ch_in=model_config['ch_in'],
                     kernel_size=model_config['kernel_size'],
                     activ=model_config['activ'],
                     norm=model_config['norm'],
@@ -317,12 +312,10 @@ if __name__ == '__main__':
         wrapper.name = f'{wrapper.name}+SANDesc' # eventually change name
         print(f"Using custom descriptor: {custom_desc} with {wrapper.name} wrapper\n")
 
-    if matcher=='mnn':
-        print(f"Using matcher: {matcher} with ratio_test: {ratio_test} and min_score: {min_score}")
-        key = f'{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th}_{matcher} scale_{scale_factor} {max_kpts}'
-    elif matcher=='dual_softmax':
-        key = f'{wrapper.name} th_{th}_{matcher}_scale_{scale_factor} {max_kpts:,}'
+    # matcher
+    key = f'{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th} scale_{scale_factor} {max_kpts}'
 
+    # adding partial or full and run_tag
     key += " partial" if partial is True else " full"
     key = f'{key} {args.run_tag}' if args.run_tag is not None else key
     print(f'\n\n>>> Running benchmark for {key} <<<\n\n')
@@ -330,7 +323,7 @@ if __name__ == '__main__':
     # create if not exists
     results_path = Path('benchmarks/graz_high_res/results')
     os.makedirs(results_path, exist_ok=True)
-    
+
     if not os.path.exists(results_path/'results.json'):
         with open(results_path/'results.json', 'w') as f:
             json.dump({}, f)
@@ -343,25 +336,26 @@ if __name__ == '__main__':
         results = data[key]
         warnings.warn("A similar run already exists.", UserWarning)
     f.close()
-    
+
     # Define the benchmark
     benchmark = GrazHighResMNNBenchmark(
-        ratio_test=ratio_test, 
-        min_score=min_score, 
-        max_kpts=max_kpts, 
+        ratio_test=ratio_test,
+        min_score=min_score,
+        max_kpts=max_kpts,
         th=th,
         partial=partial,
-        matcher=matcher
         )
-    
+
     # Run the benchmark
-    results, timestamp = benchmark.benchmark(wrapper, save_stats=args.stats, factor=scale_factor) # this sf sets the size
+    results, timestamp = benchmark.benchmark(wrapper,
+                                             save_stats=args.stats,
+                                             factor=scale_factor
+                                            )
     print_metrics(wrapper, results)
-    print('------------------------------------------------------------------------------')
+    print('------------------------------------------------------------------')
 
     # Save the results
     data[f'{key} {timestamp}'] = results
     with open(results_path/'results.json', 'w') as f:
         json.dump(data, f)
     f.close()
-

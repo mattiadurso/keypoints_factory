@@ -4,6 +4,7 @@ import numpy as np
 import pycolmap as pcm
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
+
 class SIFTPyColmapWrapper(MethodWrapper):
     def __init__(self, device: str = 'cuda', border=16, sift_opts: dict = None):
         """
@@ -11,14 +12,15 @@ class SIFTPyColmapWrapper(MethodWrapper):
         sift_opts: dict of pycolmap.SiftExtractionOptions fields (optional)
         """
         super().__init__(name='sift', border=border, device=device)
-        print(f'By default, SIFT uses CPU even if CUDA is available. To use GPU, install pycolmap with CUDA support.') #https://colmap.github.io/pycolmap/index.html
+        print('By default, SIFT uses CPU even if CUDA is available. \
+              To use GPU, install pycolmap with CUDA support.\
+              ')  # https://colmap.github.io/pycolmap/index.html
 
         # Build SIFT options (defaults are good; expose a dict for tweaks)
         if sift_opts is None:
             sift_opts = {}
         self.options = pcm.SiftExtractionOptions(**sift_opts)
         self.sift = pcm.Sift(self.options, device=pcm.Device.auto)
-
 
     def _to_gray_uint8(self, img_chw: torch.Tensor) -> np.ndarray:
         """
@@ -44,14 +46,12 @@ class SIFTPyColmapWrapper(MethodWrapper):
         gray = np.ascontiguousarray(gray.astype(np.uint8))
         return gray
 
-
-    @torch.inference_mode()
     def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
         """
         x: CHW torch tensor in [0,1] or [0,255] (H,W multiples of 16 OK).
         Returns MethodOutput with:
           - kpts: Tensor [N,2] (x,y)
-          - kpts_scores: None (pycolmap SIFT doesn’t expose scores via extract)
+          - kpts_scores: None (pycolmap SIFT doesn't expose scores via extract)
           - des: Tensor [N,128]
         """
         # Ensure 4D -> 3D CHW
@@ -65,7 +65,7 @@ class SIFTPyColmapWrapper(MethodWrapper):
         kpts4, des = self.sift.extract(gray)  # numpy arrays
 
         if max_kpts is not None and kpts4.shape[0] > max_kpts:
-            idx = np.argsort(-kpts4[:, 2])[:max_kpts]  # keep by scale as a proxy for saliency
+            idx = np.argsort(-kpts4[:, 2])[:max_kpts]
             kpts4 = kpts4[idx]
             des = des[idx]
 

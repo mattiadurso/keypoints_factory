@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Union, Dict, Tuple, List, Any, Optional
+from typing import Union, Tuple, List, Any, Optional
 
 import h5py
 import torch
@@ -11,6 +11,7 @@ from torch.nn import functional as F
 import numpy as np
 import imageio.v3 as io
 from abc import ABC, abstractmethod
+
 
 @dataclass
 class MethodOutput:
@@ -127,9 +128,10 @@ class MethodOutput:
     @property
     def nkpts(self) -> int:
         return self.kpts.shape[0]
-    
+
     def keys(self) -> List[str]:
         return list(self.__dict__.keys())
+
 
 class MethodWrapper(ABC):
     def __init__(self, name: str, border: int = 0, device: str = 'cpu', use_amp=True):
@@ -139,17 +141,18 @@ class MethodWrapper(ABC):
         self.to_torch = transforms.ToTensor()
         self.custom_descriptor = None
 
-        # amp 
+        # amp
         self.use_amp = use_amp
         if self.use_amp:
-            print(f"Using automatic mixed precision.")
+            print("Using automatic mixed precision.")
         self.amp_dtype = torch.float16  
+
     def load_image(self, path):
         img = io.imread(path)
         return self.img_from_numpy(img)
 
     def img_from_numpy(self, img: np.ndarray) -> Union[Tensor, np.ndarray]:
-        assert img.dtype == np.uint8, f"Image must be uint8, got {img.dtype}" # otherwise no scaling in ToTensor()
+        assert img.dtype == np.uint8, f"Image must be uint8, got {img.dtype}"  # otherwise no scaling in ToTensor()
         img = self.crop_multiple_of(img, multiple_of=16)
         img_out = self.to_torch(img).to(self.device) 
         return img_out
@@ -160,7 +163,7 @@ class MethodWrapper(ABC):
             new_H = (H // multiple_of) * multiple_of
             new_W = (W // multiple_of) * multiple_of
             return img[:new_H, :new_W, :]
-        
+
         elif isinstance(img, Tensor):
             H, W = img.shape[-2:]
             new_H = (H // multiple_of) * multiple_of
@@ -172,7 +175,7 @@ class MethodWrapper(ABC):
     def add_custom_descriptors(self, model):
         # can be whatever model that takes (B, C, H, W) as input and returns (B, D, H, W)
         self.custom_descriptor = model
-    
+
     def to_pixel_coords(self, flow, h1, w1):
         w_ = w1 * (flow[..., 0] + 1) / 2
         h_ = h1 * (flow[..., 1] + 1) / 2
@@ -188,21 +191,20 @@ class MethodWrapper(ABC):
         if not isinstance(img, Tensor):
             raise TypeError("Input image must be a Tensor")
 
-        H, W = img.shape[-2:] # images is supposed to be (C, H, W) or (B, C, H, W)
+        H, W = img.shape[-2:]  # images is supposed to be (C, H, W) or (B, C, H, W)
         output = self._extract(img, max_kpts)
         # ? remove all the points in the border
         valid_mask = (output.kpts[:, 0] > self.border) & (output.kpts[:, 0] < W - self.border) & \
                      (output.kpts[:, 1] > self.border) & (output.kpts[:, 1] < H - self.border)
         output = output.mask(valid_mask)
         return output
-    
+
     def model_summary(self):
         """
         I would be nice to have this to print all torchinfo.summary infos
         """
         raise NotImplementedError
-    
-    
+
     def grid_sample_nan(self, xy: Tensor, img: Tensor, mode='nearest') -> Tuple[Tensor, Tensor]:
         """ pytorch grid_sample with embedded coordinate normalization and grid nan handling (if a nan is present in xy,
         the output will be nan). Works both with input with shape Bxnx2 and B x n0 x n1 x 2
@@ -257,7 +259,6 @@ class MethodWrapper(ABC):
 
         return sampled, mask_img_nan
 
-
     def normalize_pixel_coordinates(self, xy: Tensor, shape: Tuple[int, int]) -> Tensor:
         """ normalize pixel coordinates from -1 to +1. Being (-1,-1) the exact top left corner of the image
         the coordinates must be given in a way that the center of pixel is at half coordinates (0.5,0.5)
@@ -275,6 +276,3 @@ class MethodWrapper(ABC):
         xy_norm[..., 1] = 2 * xy_norm[..., 1] / shape[0]
         xy_norm -= 1
         return xy_norm
-
-
-

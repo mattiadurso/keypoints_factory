@@ -1,24 +1,25 @@
 # NOT working class
 
 import sys
-sys.path.append('methods/method')
 import torch
+sys.path.append('methods/method')
 
 from methods.method import method
 from wrappers.wrapper import MethodWrapper, MethodOutput
 
 
 class ExampleWrapper(MethodWrapper):
-    def __init__(self, device: str = 'cuda', max_kpts: int = 2048, border=16):
+    def __init__(self, device: str = 'cuda', border=16):
         super().__init__(name='aliked', border=border, device=device)
 
-        self.model = None #.eval().to(device)
+        self.model = None  # .eval().to(device)
 
     @torch.inference_mode()
-    def _extract(self, x, max_kpts: int=2048) -> MethodOutput:
+    def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
         x = x if x.dim() == 4 else x[None]
 
-        with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, enabled=self.use_amp):
+        with torch.amp.autocast(device_type='cuda', dtype=self.amp_dtype, 
+                                enabled=self.use_amp):
             out = self.model(x)
 
         kpts = out['kpts'][:max_kpts]
