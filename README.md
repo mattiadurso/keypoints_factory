@@ -72,8 +72,8 @@ Here below we report the results when running the benchmarks. We include also re
 | ALIKED        | 40.7         | 56.6          | 38.2        | 54.2         |
 | ↳ w/ SANDesc  | **43.5**     | **60.1**      | **44.0**    | **59.6**     |
 | DeDoDe-B      | 42.9         | 59.7          | 50.8        | 65.9         |
-| DeDoDe-G      | 46.4         | 63.2          | **55.3**    | **70.9**     |
-| ↳ w/ SANDesc  | **45.2**     | **61.8**      | **52.8**    | **67.2**     |
+| DeDoDe-G      | **46.4**     | **63.2**      | **55.3**    | **70.9**     |
+| ↳ w/ SANDesc  | 45.2         | 61.8          | 52.8        | 67.2         |
 
 ### HRB Results (2048 keypoints)
 
