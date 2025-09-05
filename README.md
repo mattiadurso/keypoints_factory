@@ -98,7 +98,7 @@ Overall, methods such as DISK, SuperPoint, ALIKED, and RIPE run slower when pair
 By contrast, with the decoupled DeDoDe methods, SANDesc remains competitive: its accuracy matches DeDoDe-G and exceeds DeDoDe-B, while its runtime is close to DeDoDe-B and faster than DeDoDe-G.
 SANDesc alone requires approximately 87 ms on our hardware.
 
-| Method      | Size (M) | Speed Orig (ms) | Speed Ours (ms) | VRAM Orig (GB) | VRAM Ours (GB) |
+| Method      | Size (M) | Speed Orig (ms) | Speed SANDesc (ms)| VRAM Orig (GB) | VRAM SANDesc (GB) |
 |-------------|----------|-----------------|-----------------|----------------|----------------|
 | DISK        | 0.26     | 62.1 ± 0.1      | 135.2 ± 0.2     | 6.96           | 7.01           |
 | SuperPoint  | 0.30     | 18.3 ± 0.2      | 114.8 ± 0.2     | 3.50           | 7.18           |
