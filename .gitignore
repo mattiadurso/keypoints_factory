@@ -11,3 +11,5 @@ benchmarks/graz_high_res/data/**
 sandesc_models/*
 __bin/*
 nohup.out
+benchmarks/*/results/results.json
+benchmarks/read_linear_scaling_dedode.ipynb
