@@ -5,7 +5,10 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 
-sys.path.append('methods/dedode')
+from pathlib import Path
+method_path = Path(__file__).resolve().parents[1] / 'methods/dedode'
+sys.path.append(str(method_path))
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from methods.dedode.DeDoDe import (
@@ -23,9 +26,9 @@ class DeDoDeWrapper(MethodWrapper):
         super().__init__(name=name, border=border, device=device)
 
         # Load weights
-        detector_path = "methods/dedode/weights/dedode_detector_L.pth"
-        descriptor_G_path = "methods/dedode/weights/dedode_descriptor_G.pth"
-        descriptor_B_path = "methods/dedode/weights/dedode_descriptor_B.pth"
+        detector_path = method_path / "weights/dedode_detector_L.pth"
+        descriptor_G_path = method_path / "weights/dedode_descriptor_G.pth"
+        descriptor_B_path = method_path / "weights/dedode_descriptor_B.pth"
 
         self.detector = dedode_detector_L(
             weights=torch.load(detector_path, map_location=device),
