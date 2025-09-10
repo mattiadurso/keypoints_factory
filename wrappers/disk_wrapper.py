@@ -28,7 +28,7 @@ class DiskWrapper(MethodWrapper):
             features = self.disk.features(img[None], kind='nms', window_size=5,
                                           cutoff=0, n=max_kpts)
             kpts, kpts_scores = features[0].kp, features[0].kp_logp
-            des = features[0].desc 
+            des = features[0].desc
 
             # ? order keypoints and descriptors by scores
             order = kpts_scores.argsort(descending=True)

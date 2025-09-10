@@ -30,13 +30,8 @@ from benchmarks.benchmark_utils import (
     pose_auc
 )
 
-DATASET_PATH = Path('benchmarks/megadepth1500/data/')
-if not DATASET_PATH.exists():
-    exit('Dataset not found')
-
-
 class MegaDepthPoseMNNBenchmark:
-    def __init__(self, DATASET_PATH=DATASET_PATH, th=0.5,
+    def __init__(self, DATASET_PATH='benchmarks/megadepth1500/data/', th=0.5,
                  min_score: float = 0.0, ratio_test: float = 1.0,
                  max_kpts: int = 2048) -> None:
         '''
@@ -50,9 +45,15 @@ class MegaDepthPoseMNNBenchmark:
             matcher: matcher to be used for the computation mnn or dual_softmax
             device: device to be used for the computation
         '''
+        DATASET_PATH = Path(DATASET_PATH)  
+        assert DATASET_PATH.exists(), f"Dataset path {DATASET_PATH} does not exist."
+        
         # loading data
         with open(DATASET_PATH / 'pairs_calibrated.txt', 'r') as f:
             self.pairs_calibrated = f.read().splitlines()
+
+        # quick testing
+        # self.pairs_calibrated = self.pairs_calibrated[:5]  # comment out for full benchmark
 
         self.images_path = DATASET_PATH / 'images'
         self.max_kpts = max_kpts
@@ -62,14 +63,14 @@ class MegaDepthPoseMNNBenchmark:
         self.matcher = MNN(min_score=min_score, ratio_test=ratio_test)
 
     @torch.no_grad()
-    def benchmark(self, wrapper, calibrated=True, stats=True):
+    def benchmark(self, wrapper, calibrated=True, save_stats=True):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         fix_rng()
 
         with torch.no_grad():
             tot_e_t, tot_e_R, tot_e_pose, inlier = [], [], [], []
             thresholds = [5, 10, 20]
-            if stats:
+            if save_stats:
                 stats_df = {}
 
             for pair in tqdm(self.pairs_calibrated):
@@ -129,7 +130,7 @@ class MegaDepthPoseMNNBenchmark:
                 tot_e_pose.append(e_pose)
                 inlier.append(num_inliers)
 
-                if stats:
+                if save_stats:
                     stats_df[f'{scene_name}_{img1.replace("/", "-")}_{img2.replace("/", "-")}'] = \
                         {'idx1': img1, 'idx2': img2, 'scene_name': scene_name, \
                          'e_t': e_t, 'e_R': e_R, 'e_pose': e_pose, 'num_inliers': num_inliers}
@@ -138,7 +139,7 @@ class MegaDepthPoseMNNBenchmark:
                 torch.cuda.empty_cache()
 
             # stats to csv and save
-            if stats:
+            if save_stats:
                 stats_df = pd.DataFrame.from_dict(stats_df, orient='index')
                 path = Path('benchmarks/megadepth1500/stats')
                 os.makedirs(path, exist_ok=True)
@@ -181,6 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--th', type=float, default=0.5)
     parser.add_argument('--custom-desc', type=str, default=None)
     parser.add_argument('--stats', type=bool, default=True)
+    parser.add_argument('--dino-layer', type=int, default=-1)
     args = parser.parse_args()
 
     device = args.device
@@ -252,7 +254,7 @@ if __name__ == '__main__':
     )
 
     # Run the benchmark
-    results, timestamp = benchmark.benchmark(wrapper, stats=args.stats)
+    results, timestamp = benchmark.benchmark(wrapper, save_stats=args.stats)
     print_metrics(wrapper, results)
     print('-------------------------------------------------------------')
 

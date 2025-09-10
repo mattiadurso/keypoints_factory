@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/home/mattia/Desktop/Repos/wrapper_factory')
+
 from pathlib import Path
 
 
@@ -13,7 +16,7 @@ def get_wrappers_list():
     return sorted(wrappers)
 
 
-def wrappers_manager(name, device, mismatches=0):
+def wrappers_manager(name, device='cpu'):
     print(f'Creating wrapper for {name} on device {device}.\n')
 
     if name == 'disk':
