@@ -53,18 +53,18 @@ class MegaDepthPoseMNNBenchmark:
             max_kpts: maximum number of keypoints to be extracted
             matcher: matcher to be used for the computation mnn or dual_softmax
             device: device to be used for the computation
-        '''
-        DATASET_PATH = Path(DATASET_PATH)  
+        """
+        DATASET_PATH = Path(DATASET_PATH)
         assert DATASET_PATH.exists(), f"Dataset path {DATASET_PATH} does not exist."
-        
+
         # loading data
-        with open(DATASET_PATH / 'pairs_calibrated.txt', 'r') as f:
+        with open(DATASET_PATH / "pairs_calibrated.txt", "r") as f:
             self.pairs_calibrated = f.read().splitlines()
 
         # quick testing
         # self.pairs_calibrated = self.pairs_calibrated[:5]  # comment out for full benchmark
 
-        self.images_path = DATASET_PATH / 'images'
+        self.images_path = DATASET_PATH / "images"
         self.max_kpts = max_kpts
         self.th = th
 
@@ -85,7 +85,7 @@ class MegaDepthPoseMNNBenchmark:
             for pair in tqdm(self.pairs_calibrated):
                 img1, img2, K1, K2, R, t = parse_pair(pair)
 
-                scene_name = img1.split('/')[0]
+                scene_name = img1.split("/")[0]
 
                 im_A_path = self.images_path / img1
                 im_B_path = self.images_path / img2
@@ -100,11 +100,16 @@ class MegaDepthPoseMNNBenchmark:
                     out_A = wrapper.extract(img_A, self.max_kpts)
                     out_B = wrapper.extract(img_B, self.max_kpts)
 
-                keypoints_A, description_A = out_A.kpts, out_A.des # keypoints_A: [N, 2], description_A: [N, C]
+                keypoints_A, description_A = (
+                    out_A.kpts,
+                    out_A.des,
+                )  # keypoints_A: [N, 2], description_A: [N, C]
                 keypoints_B, description_B = out_B.kpts, out_B.des
 
                 # matcher
-                matches = self.matcher.match([description_A], [description_B])[0].matches
+                matches = self.matcher.match([description_A], [description_B])[
+                    0
+                ].matches
                 kpts1 = keypoints_A[matches[:, 0]]
                 kpts2 = keypoints_B[matches[:, 1]]
 
@@ -114,7 +119,9 @@ class MegaDepthPoseMNNBenchmark:
                 try:
                     threshold = self.th
                     if calibrated:
-                        norm_threshold = threshold / (np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2])))
+                        norm_threshold = threshold / (
+                            np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2]))
+                        )
                         R_est, t_est, mask = estimate_pose(
                             kpts1.cpu().numpy(),
                             kpts2.cpu().numpy(),
@@ -124,7 +131,7 @@ class MegaDepthPoseMNNBenchmark:
                             conf=0.99999,
                         )  # None if no pose is found
 
-                    T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)  
+                    T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)
                     e_t, e_R = compute_pose_error(T1_to_2_est, R, t)
                     e_pose = max(e_t, e_R)
                     e_pose = 180 if e_pose > 10 else e_pose
@@ -157,10 +164,12 @@ class MegaDepthPoseMNNBenchmark:
 
             # stats to csv and save
             if save_stats:
-                stats_df = pd.DataFrame.from_dict(stats_df, orient='index')
-                path = Path('benchmarks/megadepth1500/stats')
+                stats_df = pd.DataFrame.from_dict(stats_df, orient="index")
+                path = Path("benchmarks/megadepth1500/stats")
                 os.makedirs(path, exist_ok=True)
-                stats_df.to_csv(path/f'{wrapper.name}_stats_{timestamp}.csv', index=False)
+                stats_df.to_csv(
+                    path / f"{wrapper.name}_stats_{timestamp}.csv", index=False
+                )
 
             # Compute the metrics
             tot_e_pose = np.array(tot_e_pose)
@@ -216,44 +225,46 @@ if __name__ == "__main__":
     if custom_desc is not None:
         #  Eventually add my descriptors
         weights = torch.load(custom_desc, weights_only=False)
-        config = weights['config']
-        model_config = {'ch_in': config['model_config']['unet_ch_in'],
-                        'kernel_size': config['model_config']['unet_kernel_size'],
-                        'activ': config['model_config']['unet_activ'],
-                        'norm': config['model_config']['unet_norm'],
-                        'skip_connection': config['model_config']['unet_with_skip_connections'],
-                        'spatial_attention': config['model_config']['unet_spatial_attention'],
-                        'third_block': config['model_config']['third_block'],
-                        }
+        config = weights["config"]
+        model_config = {
+            "ch_in": config["model_config"]["unet_ch_in"],
+            "kernel_size": config["model_config"]["unet_kernel_size"],
+            "activ": config["model_config"]["unet_activ"],
+            "norm": config["model_config"]["unet_norm"],
+            "skip_connection": config["model_config"]["unet_with_skip_connections"],
+            "spatial_attention": config["model_config"]["unet_spatial_attention"],
+            "third_block": config["model_config"]["third_block"],
+        }
 
         from sandesc_models.sandesc.network_descriptor import SANDesc
-        network = SANDesc(**model_config).eval().to(device) 
+
+        network = SANDesc(**model_config).eval().to(device)
 
         weights = torch.load(custom_desc, weights_only=False)
-        network.load_state_dict(weights['state_dict'])
-        wrapper.add_custom_descriptors(network)
-        wrapper.name = f'{wrapper.name}+SANDesc'
-        print(f'Using custom descriptors from {custom_desc}.\n')
+        network.load_state_dict(weights["state_dict"])
+        wrapper.add_custom_descriptor(network)
+        wrapper.name = f"{wrapper.name}+SANDesc"
+        print(f"Using custom descriptors from {custom_desc}.\n")
 
     # matcher params
-    key = f'{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th}_mnn {max_kpts}'
+    key = f"{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th}_mnn {max_kpts}"
 
     # add tag to the key
     if args.run_tag is not None:
-        key = f'{key} {args.run_tag}'
+        key = f"{key} {args.run_tag}"
 
-    print(f'\n>>> Running benchmark for {key}...<<<\n')
+    print(f"\n>>> Running benchmark for {key}...<<<\n")
 
     # create if not exists
-    results_path = Path('benchmarks/megadepth1500/results')
+    results_path = Path("benchmarks/megadepth1500/results")
     os.makedirs(results_path, exist_ok=True)
 
-    if not os.path.exists(results_path/'results.json'):
-        with open(results_path/'results.json', 'w') as f:
+    if not os.path.exists(results_path / "results.json"):
+        with open(results_path / "results.json", "w") as f:
             json.dump({}, f)
         f.close()
 
-    with open(results_path/'results.json', 'r') as f:
+    with open(results_path / "results.json", "r") as f:
         data = json.load(f)
 
     if key in data:
@@ -264,19 +275,16 @@ if __name__ == "__main__":
 
     # Define the benchmark
     benchmark = MegaDepthPoseMNNBenchmark(
-        ratio_test=ratio_test,
-        min_score=min_score,
-        max_kpts=max_kpts,
-        th=th
+        ratio_test=ratio_test, min_score=min_score, max_kpts=max_kpts, th=th
     )
 
     # Run the benchmark
     results, timestamp = benchmark.benchmark(wrapper, save_stats=args.stats)
     print_metrics(wrapper, results)
-    print('-------------------------------------------------------------')
+    print("-------------------------------------------------------------")
 
     # Save the results
-    data[f'{key} {timestamp}'] = results
-    with open(results_path/'results.json', 'w') as f:
+    data[f"{key} {timestamp}"] = results
+    with open(results_path / "results.json", "w") as f:
         json.dump(data, f)
     f.close()
