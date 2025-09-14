@@ -65,6 +65,7 @@ class HPatchesBenchmark:
         self.mnn_ratio_test = mnn_ratio_test
         self.seed = seed
         self.feature_path = feature_path
+        self.save_csv = save_csv
 
         # Matcher params
         self.matcher_params = {"min_score": mnn_min_score, "ratio_test": mnn_ratio_test}
