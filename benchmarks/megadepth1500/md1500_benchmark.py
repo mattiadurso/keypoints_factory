@@ -2,14 +2,17 @@
 # source: https://github.com/Parskatt/DeDoDe/blob/main/DeDoDe/benchmarks/mega_pose_est_mnn.py
 
 import os
+
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 import sys
 from pathlib import Path
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # adjust as needed
 sys.path.insert(0, str(PROJECT_ROOT))  # contains the 'methods' package
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import gc
@@ -27,14 +30,20 @@ from benchmarks.benchmark_utils import (
     print_metrics,
     estimate_pose,
     compute_pose_error,
-    pose_auc
+    pose_auc,
 )
 
+
 class MegaDepthPoseMNNBenchmark:
-    def __init__(self, DATASET_PATH='benchmarks/megadepth1500/data/', th=0.5,
-                 min_score: float = 0.0, ratio_test: float = 1.0,
-                 max_kpts: int = 2048) -> None:
-        '''
+    def __init__(
+        self,
+        DATASET_PATH="benchmarks/megadepth1500/data/",
+        th=0.5,
+        min_score: float = 0.0,
+        ratio_test: float = 1.0,
+        max_kpts: int = 2048,
+    ) -> None:
+        """
         Args:
             DATASET_PATH: path to the dataset
             scene_names: list of scene names to be used for the benchmark
@@ -131,9 +140,17 @@ class MegaDepthPoseMNNBenchmark:
                 inlier.append(num_inliers)
 
                 if save_stats:
-                    stats_df[f'{scene_name}_{img1.replace("/", "-")}_{img2.replace("/", "-")}'] = \
-                        {'idx1': img1, 'idx2': img2, 'scene_name': scene_name, \
-                         'e_t': e_t, 'e_R': e_R, 'e_pose': e_pose, 'num_inliers': num_inliers}
+                    stats_df[
+                        f'{scene_name}_{img1.replace("/", "-")}_{img2.replace("/", "-")}'
+                    ] = {
+                        "idx1": img1,
+                        "idx2": img2,
+                        "scene_name": scene_name,
+                        "e_t": e_t,
+                        "e_R": e_R,
+                        "e_pose": e_pose,
+                        "num_inliers": num_inliers,
+                    }
 
                 gc.collect()
                 torch.cuda.empty_cache()
@@ -158,31 +175,31 @@ class MegaDepthPoseMNNBenchmark:
 
             return {
                 "inlier": np.mean(inlier),
-                "auc_5":  auc[0],
+                "auc_5": auc[0],
                 "auc_10": auc[1],
                 "auc_20": auc[2],
-                "map_5":  map_5,
+                "map_5": map_5,
                 "map_10": map_10,
                 "map_20": map_20,
             }, timestamp
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import json
     import argparse
     from wrappers_manager import wrappers_manager
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--wrapper-name', type=str, default='disk')
-    parser.add_argument('--run-tag', type=str, default=None)
-    parser.add_argument('--ratio-test', type=float, default=1.0)
-    parser.add_argument('--min-score', type=float, default=-1.0)
-    parser.add_argument('--max-kpts', type=int, default=2048)
-    parser.add_argument('--th', type=float, default=0.5)
-    parser.add_argument('--custom-desc', type=str, default=None)
-    parser.add_argument('--stats', type=bool, default=True)
-    parser.add_argument('--dino-layer', type=int, default=-1)
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--wrapper-name", type=str, default="disk")
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--ratio-test", type=float, default=1.0)
+    parser.add_argument("--min-score", type=float, default=-1.0)
+    parser.add_argument("--max-kpts", type=int, default=2048)
+    parser.add_argument("--th", type=float, default=0.5)
+    parser.add_argument("--custom-desc", type=str, default=None)
+    parser.add_argument("--stats", type=bool, default=True)
+    parser.add_argument("--dino-layer", type=int, default=-1)
     args = parser.parse_args()
 
     device = args.device
