@@ -21,12 +21,10 @@ def unproject_points2d(points, K, remove_last=True):
     K = to_torch(K, b=False)
 
     points = to_homogeneous(points)
-    points_unprojected = \
-        (K.inverse() @ points.permute(-1, -2)).permute(-1, -2)
+    points_unprojected = (K.inverse() @ points.permute(-1, -2)).permute(-1, -2)
 
     if remove_last:
-        points_unprojected = \
-            points_unprojected[:, :2] / points_unprojected[:, 2:]
+        points_unprojected = points_unprojected[:, :2] / points_unprojected[:, 2:]
         return points_unprojected.reshape(-1, 2)
 
     points_unprojected = points_unprojected / points_unprojected[:, 2:]
@@ -39,15 +37,15 @@ def to_homogeneous(vector):
     """
     vector = to_torch(vector, b=False)
     if vector.shape[1] == 2:
-        vector = torch.hstack([vector, torch.ones_like(vector)[...,:1]])
+        vector = torch.hstack([vector, torch.ones_like(vector)[..., :1]])
     return vector.float()
 
 
 def compute_epipolar_lines_coeff(
-        E: TensorOrArray,  # bx3x3
-        points: TensorOrArray,  # bxNx2
-        K=None,  # bx3x3
-        ):
+    E: TensorOrArray,  # bx3x3
+    points: TensorOrArray,  # bxNx2
+    K=None,  # bx3x3
+):
     """
     Compute the epipolar lines coefficients from the essential/fundamental
     matrix and the points. It is needed to unproject points if using the
@@ -80,7 +78,7 @@ def distance_line_points_parallel(line, points):
     """
     a, b, c = line.flatten()
     x, y = points[:, 0], points[:, 1]
-    return torch.abs(a * x + b * y + c) / (a ** 2 + b ** 2) ** 0.5
+    return torch.abs(a * x + b * y + c) / (a**2 + b**2) ** 0.5
 
 
 def is_torch(vector):
@@ -107,7 +105,7 @@ def to_torch(vector_, b=True):
     return vector.float()
 
 
-def compute_fundamental_from_relative_motion(R,t,K0,K1):
+def compute_fundamental_from_relative_motion(R, t, K0, K1):
     """
     Compute the fundamental matrix from the relative rotation and translation.
     Args:
@@ -175,38 +173,42 @@ def plot_imgs(images, titles=None, rows=1):
                     img = img.permute(1, 2, 0).cpu().numpy()  # Channels first to last
 
             # Determine colormap based on number of channels
-            if (img.ndim == 2 or (img.ndim == 3 and img.shape[-1] == 1)):
-                cmap = 'gray'
+            if img.ndim == 2 or (img.ndim == 3 and img.shape[-1] == 1):
+                cmap = "gray"
             else:
                 cmap = None
 
             ax.imshow(img.squeeze(), cmap=cmap)
-            ax.axis('off')
+            ax.axis("off")
 
             # Set title if provided
             if titles is not None and idx < len(titles):
                 ax.set_title(titles[idx])
         else:
-            ax.axis('off')  # Hide unused axes
+            ax.axis("off")  # Hide unused axes
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_imgs_and_kpts(img1, img2,
-                       kpt1, kpt2,
-                       space=100,
-                       matches=True,
-                       index=False,
-                       sample_points=32,
-                       pad=False,
-                       figsize=(10, 5),
-                       axis=True,
-                       scatter=True,
-                       highlight_bad_matches=None,
-                       F_gt=None,
-                       plot_name=None,
-                       reth=5):
+def plot_imgs_and_kpts(
+    img1,
+    img2,
+    kpt1,
+    kpt2,
+    space=100,
+    matches=True,
+    index=False,
+    sample_points=32,
+    pad=False,
+    figsize=(10, 5),
+    axis=True,
+    scatter=True,
+    highlight_bad_matches=None,
+    F_gt=None,
+    plot_name=None,
+    reth=5,
+):
     """
     Plot two images side by side with keypoints overlayed and matches if specified.
     """
@@ -227,10 +229,11 @@ def plot_imgs_and_kpts(img1, img2,
         pad_top = total_pad // 2
 
         # build pad canvas with desired color
-        color_tensor = \
-            torch.tensor(pad_color, dtype=img.dtype, device=img.device).view(1, 1, 3)
+        color_tensor = torch.tensor(pad_color, dtype=img.dtype, device=img.device).view(
+            1, 1, 3
+        )
         padded = color_tensor.expand(target_h, w, 3).clone()
-        padded[pad_top:pad_top + h] = img
+        padded[pad_top : pad_top + h] = img
         return padded, pad_top
 
     # Determine target height and pad both images
@@ -250,33 +253,69 @@ def plot_imgs_and_kpts(img1, img2,
     if pad:
         # find smaller image and put in in a white canvas of the size of the bigger image
         if img1.shape[0] < img2.shape[0]:
-            img1 = torch.cat((img1, torch.ones((img2.shape[0]-img1.shape[0], img1.shape[1], c)).int()*255), dim=0)
+            img1 = torch.cat(
+                (
+                    img1,
+                    torch.ones((img2.shape[0] - img1.shape[0], img1.shape[1], c)).int()
+                    * 255,
+                ),
+                dim=0,
+            )
         else:
-            img2 = torch.cat((img2, torch.ones((img1.shape[0]-img2.shape[0], img2.shape[1], c)).int()*255), dim=0)
+            img2 = torch.cat(
+                (
+                    img2,
+                    torch.ones((img1.shape[0] - img2.shape[0], img2.shape[1], c)).int()
+                    * 255,
+                ),
+                dim=0,
+            )
 
         if img1.shape[1] < img2.shape[1]:
-            img1 = torch.cat((img1, torch.ones((img1.shape[0], img2.shape[1]-img1.shape[1], c)).int()*255), dim=1)
+            img1 = torch.cat(
+                (
+                    img1,
+                    torch.ones((img1.shape[0], img2.shape[1] - img1.shape[1], c)).int()
+                    * 255,
+                ),
+                dim=1,
+            )
         else:
-            img2 = torch.cat((img2, torch.ones((img2.shape[0], img1.shape[1]-img2.shape[1], c)).int()*255), dim=1)
-    
+            img2 = torch.cat(
+                (
+                    img2,
+                    torch.ones((img2.shape[0], img1.shape[1] - img2.shape[1], c)).int()
+                    * 255,
+                ),
+                dim=1,
+            )
+
     # print(img1.shape, img2.shape)
 
-    white = torch.ones((img1.shape[0], space, c)).int()*255
+    white = torch.ones((img1.shape[0], space, c)).int() * 255
     concat = torch.cat((img1, white, img2), dim=1).int()
-    
+
     plt.figure(figsize=figsize)
     plt.imshow(concat)
 
     if scatter:
         if sample_points and sample_points < len(kpt1):
-            kpt1 = kpt1[::len(kpt1)//sample_points]
-            kpt2 = kpt2[::len(kpt2)//sample_points]
-        
+            kpt1 = kpt1[:: len(kpt1) // sample_points]
+            kpt2 = kpt2[:: len(kpt2) // sample_points]
+
         if index:
             for i, (x, y) in enumerate(kpt1):
-                plt.text(x, y, c="w", s=str(i), fontsize=6, ha='center', va='center')
+                plt.text(x, y, c="w", s=str(i), fontsize=6, ha="center", va="center")
             for i, (x, y) in enumerate(kpt2):
-                plt.text(x + img1.shape[1] + space, y, c="w", s=str(i), fontsize=6, ha='center', va='center')
+                plt.text(
+                    x + img1.shape[1] + space,
+                    y,
+                    c="w",
+                    s=str(i),
+                    fontsize=6,
+                    ha="center",
+                    va="center",
+                )
 
         plt.scatter(kpt1[:, 0], kpt1[:, 1], c="r", s=25)
         plt.scatter(kpt2[:, 0] + img1.shape[1] + space, kpt2[:, 1], c="r", s=25)
@@ -292,50 +331,72 @@ def plot_imgs_and_kpts(img1, img2,
             epilines_A = compute_epipolar_lines_coeff(E12, points1)
             epilines_B = compute_epipolar_lines_coeff(E21, points2)
 
-            repr_err_A = [distance_line_points_parallel(epilines_A[i], points2[i][None]).item()
-                          for i in range(epilines_A.shape[0])]
-            repr_err_B = [distance_line_points_parallel(epilines_B[i], points1[i][None]).item()
-                          for i in range(epilines_B.shape[0])]
+            repr_err_A = [
+                distance_line_points_parallel(epilines_A[i], points2[i][None]).item()
+                for i in range(epilines_A.shape[0])
+            ]
+            repr_err_B = [
+                distance_line_points_parallel(epilines_B[i], points1[i][None]).item()
+                for i in range(epilines_B.shape[0])
+            ]
             # print('median reprojection error A:', np.median(repr_err_A))
             # print('median reprojection error B:', np.median(repr_err_B))
 
             reth = 5
-            good_matches = (torch.tensor(repr_err_A) <= reth) & \
-                (torch.tensor(repr_err_B) <= reth)
+            good_matches = (torch.tensor(repr_err_A) <= reth) & (
+                torch.tensor(repr_err_B) <= reth
+            )
 
             kpts1_matched_good = kpt1[good_matches]
             kpts2_matched_good = kpt2[good_matches]
 
             kpts1_matched_bad = kpt1[~good_matches]
             kpts2_matched_bad = kpt2[~good_matches]
-            print(f'Reprojection error threshold: {reth} pixels')
-            print(f'Inliers: {kpts1_matched_good.shape[0]}/{kpt1.shape[0]}')
+            print(f"Reprojection error threshold: {reth} pixels")
+            print(f"Inliers: {kpts1_matched_good.shape[0]}/{kpt1.shape[0]}")
 
             for i in range(kpts1_matched_good.shape[0]):
-                plt.plot([kpts1_matched_good[i, 0],
-                          kpts2_matched_good[i, 0] + img1.shape[1] + space],
-                         [kpts1_matched_good[i, 1], kpts2_matched_good[i, 1]],
-                         c="g", linewidth=1, alpha=0.85)
+                plt.plot(
+                    [
+                        kpts1_matched_good[i, 0],
+                        kpts2_matched_good[i, 0] + img1.shape[1] + space,
+                    ],
+                    [kpts1_matched_good[i, 1], kpts2_matched_good[i, 1]],
+                    c="g",
+                    linewidth=1,
+                    alpha=0.85,
+                )
 
             for i in range(kpts1_matched_bad.shape[0]):
-                plt.plot([kpts1_matched_bad[i, 0],
-                          kpts2_matched_bad[i, 0] + img1.shape[1] + space],
-                         [kpts1_matched_bad[i, 1], kpts2_matched_bad[i, 1]],
-                         c="r", linewidth=1, alpha=0.85)
+                plt.plot(
+                    [
+                        kpts1_matched_bad[i, 0],
+                        kpts2_matched_bad[i, 0] + img1.shape[1] + space,
+                    ],
+                    [kpts1_matched_bad[i, 1], kpts2_matched_bad[i, 1]],
+                    c="r",
+                    linewidth=1,
+                    alpha=0.85,
+                )
 
         else:
             for i in range(kpt1.shape[0]):
-                plt.plot([kpt1[i, 0], kpt2[i, 0] + img1.shape[1] + space],
-                         [kpt1[i, 1], kpt2[i, 1]], c="g", linewidth=1, alpha=0.85)
-                
-    plt.axis('off' if axis else 'on')
+                plt.plot(
+                    [kpt1[i, 0], kpt2[i, 0] + img1.shape[1] + space],
+                    [kpt1[i, 1], kpt2[i, 1]],
+                    c="g",
+                    linewidth=1,
+                    alpha=0.85,
+                )
+
+    plt.axis("off" if axis else "on")
     # save
     plt.tight_layout()
     if plot_name is not None:
         # timestamp
         time_ = time.strftime("%Y-%m-%d_%H-%M-%S")
-        plot_name = plot_name if plot_name is not None else f'plot_{time_}'
-        plt.savefig(plot_name+'.png', bbox_inches='tight', pad_inches=0.1)
+        plot_name = plot_name if plot_name is not None else f"plot_{time_}"
+        plt.savefig(plot_name + ".png", bbox_inches="tight", pad_inches=0.1)
     plt.show()
     plt.close()
 
