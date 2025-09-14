@@ -26,10 +26,12 @@ from tqdm.auto import tqdm
 import multiprocessing as mp
 
 from benchmarks.benchmark_utils import (
+    str2bool,
     fix_rng,
     convert_numpy_types,
+    display_hpatches_results,
 )
-from benchmarks.hpatches.hpathces_benchmark_utils import (
+from benchmarks.hpatches.hpatches_benchmark_utils import (
     load_hpatches_in_memory,
     compute_matching_stats,
 )
@@ -88,6 +90,7 @@ class HPatchesBenchmark:
 
         # save keypoints and descriptors in a dict
         features_dict = {"keypoints": keypoints, "descriptors": descriptors}
+        os.makedirs("benchmarks/hpatches/features", exist_ok=True)
         torch.save(
             features_dict,
             f"benchmarks/hpatches/features/{wrapper.name}_{self.max_kpts}kpts.pth",
@@ -284,9 +287,9 @@ if __name__ == "__main__":
     parser.add_argument("--ratio-test", type=float, default=1.0)
     parser.add_argument("--feature-path", type=str, default=None)
     parser.add_argument("--custom-desc", type=str, default=None)
-    parser.add_argument("--stats", type=bool, default=True)
-    parser.add_argument("--n-jobs", type=int, default=-1)
-    parser.add_argument("--save-csv", type=bool, default=True)
+    parser.add_argument("--stats", type=str2bool, default=False)
+    parser.add_argument("--save-csv", type=str2bool, default=True)
+    parser.add_argument("--n-jobs", type=int, default=-1)  # mt not implemented yet
     parser.add_argument(
         "--thresholds",
         type=float,
@@ -414,22 +417,10 @@ if __name__ == "__main__":
     print(f"Results saved to {results_path/'results.json'}")
 
     # Print summary
-    print(f"\n{'='*80}")
-    print(f"HPatches Benchmark Results - {wrapper.name}")
-    print(f"{'='*80}")
-    print(f"Method: {results['method']}")
-    print(f"Max keypoints: {results['max_keypoints']}")
-    print(f"Benchmark time: {total_time:.1f}s")
-    print(f"{'='*80}")
-
-    # Print results for each category
-    from benchmarks.benchmark_utils import display_hpatches_results
-
     print("=== HPatches Overall Results ===")
-    df_overall = display_hpatches_results(
+    _ = display_hpatches_results(
         results_file=results_path / "results.json",
         partition="overall",
         method=f"{key}_{timestamp}",
     )
-    print(df_overall.to_string(index=False))
     print(f"{'='*80}")

@@ -18,7 +18,9 @@ class MethodOutput:
     kpts: Tensor
     kpts_scores: Optional[Tensor] = None
     kpts_sizes: Optional[Tensor] = None  # ? receptive field
-    kpts_scales: Optional[Tensor] = None  # ? at which resolution they have been extracted
+    kpts_scales: Optional[Tensor] = (
+        None  # ? at which resolution they have been extracted
+    )
     kpts_angles: Optional[Tensor] = None
     des: Optional[Tensor] = None
     des_scores: Optional[Tensor] = None
@@ -28,7 +30,9 @@ class MethodOutput:
     side_map: Optional[Tensor] = None
 
     def __post_init__(self):
-        assert self.kpts.ndim == 2, f"kpts must have shape (N, 2), got {self.kpts.shape}"
+        assert (
+            self.kpts.ndim == 2
+        ), f"kpts must have shape (N, 2), got {self.kpts.shape}"
         # ? put emtpy stuff in place of None
         if self.kpts_scores is None:
             self.kpts_scores = torch.ones_like(self.kpts[:, 0])
@@ -67,9 +71,13 @@ class MethodOutput:
             kpts_scales=self.kpts_scales.clone()[mask],
             kpts_angles=self.kpts_angles.clone()[mask],
             des=self.des.clone()[mask] if self.des is not None else None,
-            des_scores=self.des_scores.clone()[mask] if self.des_scores is not None else None,
+            des_scores=(
+                self.des_scores.clone()[mask] if self.des_scores is not None else None
+            ),
             det_map=self.det_map.clone() if self.det_map is not None else None,
-            det_map_proc=self.det_map_proc.clone() if self.det_map_proc is not None else None,
+            det_map_proc=(
+                self.det_map_proc.clone() if self.det_map_proc is not None else None
+            ),
             des_vol=self.des_vol.clone() if self.des_vol is not None else None,
             side_map=self.side_map.clone() if self.side_map is not None else None,
         )
@@ -83,45 +91,49 @@ class MethodOutput:
             kpts_scales=self.kpts_scales.clone()[:n],
             kpts_angles=self.kpts_angles.clone()[:n],
             des=self.des.clone()[:n] if self.des is not None else None,
-            des_scores=self.des_scores.clone()[:n] if self.des_scores is not None else None,
+            des_scores=(
+                self.des_scores.clone()[:n] if self.des_scores is not None else None
+            ),
             det_map=self.det_map.clone() if self.det_map is not None else None,
-            det_map_proc=self.det_map_proc.clone() if self.det_map_proc is not None else None,
+            det_map_proc=(
+                self.det_map_proc.clone() if self.det_map_proc is not None else None
+            ),
             des_vol=self.des_vol.clone() if self.des_vol is not None else None,
             side_map=self.side_map.clone() if self.side_map is not None else None,
         )
 
-    def save_as_h5(self, path: Path | str, tag: str = '') -> None:
+    def save_as_h5(self, path: Path | str, tag: str = "") -> None:
         path.mkdir(parents=True, exist_ok=True)
         # ? save the keypoints as h5py
-        with h5py.File(path / f'{tag}keypoints.h5', 'w') as fp:
-            fp.create_dataset('keypoints', data=self.kpts.cpu().numpy())
-            fp.create_dataset('scores', data=self.kpts_scores.cpu().numpy())
-            fp.create_dataset('sizes', data=self.kpts_sizes.cpu().numpy())
-            fp.create_dataset('scales', data=self.kpts_scales.cpu().numpy())
-            fp.create_dataset('angles', data=self.kpts_angles.cpu().numpy())
+        with h5py.File(path / f"{tag}keypoints.h5", "w") as fp:
+            fp.create_dataset("keypoints", data=self.kpts.cpu().numpy())
+            fp.create_dataset("scores", data=self.kpts_scores.cpu().numpy())
+            fp.create_dataset("sizes", data=self.kpts_sizes.cpu().numpy())
+            fp.create_dataset("scales", data=self.kpts_scales.cpu().numpy())
+            fp.create_dataset("angles", data=self.kpts_angles.cpu().numpy())
 
         # ? save the descriptors as h5py
         if self.des is not None:
-            with h5py.File(path / f'{tag}descriptors.h5', 'w') as fp:
-                fp.create_dataset('descriptors', data=self.des.cpu().numpy())
+            with h5py.File(path / f"{tag}descriptors.h5", "w") as fp:
+                fp.create_dataset("descriptors", data=self.des.cpu().numpy())
 
     @staticmethod
-    def load_from_h5(path: Path, tag: str = '') -> MethodOutput:
-        kpts_path = path / f'{tag}keypoints.h5'
-        assert kpts_path.exists(), f'keypoints file {kpts_path} does not exist'
-        with h5py.File(kpts_path, 'r') as fp:
+    def load_from_h5(path: Path, tag: str = "") -> MethodOutput:
+        kpts_path = path / f"{tag}keypoints.h5"
+        assert kpts_path.exists(), f"keypoints file {kpts_path} does not exist"
+        with h5py.File(kpts_path, "r") as fp:
             output = MethodOutput(
-                kpts=torch.from_numpy(fp['keypoints'][()]),
-                kpts_scores=torch.from_numpy(fp['scores'][()]),
-                kpts_sizes=torch.from_numpy(fp['sizes'][()]),
-                kpts_scales=torch.from_numpy(fp['scales'][()]),
-                kpts_angles=torch.from_numpy(fp['angles'][()]),
+                kpts=torch.from_numpy(fp["keypoints"][()]),
+                kpts_scores=torch.from_numpy(fp["scores"][()]),
+                kpts_sizes=torch.from_numpy(fp["sizes"][()]),
+                kpts_scales=torch.from_numpy(fp["scales"][()]),
+                kpts_angles=torch.from_numpy(fp["angles"][()]),
             )
 
-        des_path = path / f'{tag}descriptors.h5'
+        des_path = path / f"{tag}descriptors.h5"
         if des_path.exists():
-            with h5py.File(des_path, 'r') as fp:
-                output.des = torch.from_numpy(fp['descriptors'][()])
+            with h5py.File(des_path, "r") as fp:
+                output.des = torch.from_numpy(fp["descriptors"][()])
 
         return output
 
@@ -134,27 +146,30 @@ class MethodOutput:
 
 
 class MethodWrapper(ABC):
-    def __init__(self, name: str, border: int = 0, device: str = 'cpu', use_amp=True):
+    def __init__(self, name: str, border: int = 0, device: str = "cpu", use_amp=True):
         self.name = name
         self.border = border
         self.device = device
         self.to_torch = transforms.ToTensor()
         self.custom_descriptor = None
+        self.matcher = None
 
         # amp
         self.use_amp = use_amp
         if self.use_amp:
             print("Using automatic mixed precision.")
-        self.amp_dtype = torch.float16  
+        self.amp_dtype = torch.float16
 
     def load_image(self, path):
         img = io.imread(path)
         return self.img_from_numpy(img)
 
     def img_from_numpy(self, img: np.ndarray) -> Union[Tensor, np.ndarray]:
-        assert img.dtype == np.uint8, f"Image must be uint8, got {img.dtype}"  # otherwise no scaling in ToTensor()
+        assert (
+            img.dtype == np.uint8
+        ), f"Image must be uint8, got {img.dtype}"  # otherwise no scaling in ToTensor()
         img = self.crop_multiple_of(img, multiple_of=16)
-        img_out = self.to_torch(img).to(self.device) 
+        img_out = self.to_torch(img).to(self.device)
         return img_out
 
     def crop_multiple_of(self, img, multiple_of=16):
@@ -172,30 +187,38 @@ class MethodWrapper(ABC):
         else:
             raise TypeError("Unsupported image type")
 
-    def add_custom_descriptors(self, model):
+    def add_custom_descriptor(self, model):
         # can be whatever model that takes (B, C, H, W) as input and returns (B, D, H, W)
         self.custom_descriptor = model
 
     def to_pixel_coords(self, flow, h1, w1):
         w_ = w1 * (flow[..., 0] + 1) / 2
         h_ = h1 * (flow[..., 1] + 1) / 2
-        flow = (torch.stack((w_ , h_), axis=-1))
+        flow = torch.stack((w_, h_), axis=-1)
         return flow
 
     @abstractmethod
-    def _extract(self, img: Union[Tensor, np.ndarray], max_kpts: Union[float, int]) -> MethodOutput:
+    def _extract(
+        self, img: Union[Tensor, np.ndarray], max_kpts: Union[float, int]
+    ) -> MethodOutput:
         raise NotImplementedError
 
     @torch.inference_mode()
-    def extract(self, img: Union[Tensor, np.ndarray], max_kpts: Union[float, int]) -> MethodOutput:
+    def extract(
+        self, img: Union[Tensor, np.ndarray], max_kpts: Union[float, int]
+    ) -> MethodOutput:
         if not isinstance(img, Tensor):
             raise TypeError("Input image must be a Tensor")
 
         H, W = img.shape[-2:]  # images is supposed to be (C, H, W) or (B, C, H, W)
         output = self._extract(img, max_kpts)
         # ? remove all the points in the border
-        valid_mask = (output.kpts[:, 0] > self.border) & (output.kpts[:, 0] < W - self.border) & \
-                     (output.kpts[:, 1] > self.border) & (output.kpts[:, 1] < H - self.border)
+        valid_mask = (
+            (output.kpts[:, 0] > self.border)
+            & (output.kpts[:, 0] < W - self.border)
+            & (output.kpts[:, 1] > self.border)
+            & (output.kpts[:, 1] < H - self.border)
+        )
         output = output.mask(valid_mask)
         return output
 
@@ -205,8 +228,10 @@ class MethodWrapper(ABC):
         """
         raise NotImplementedError
 
-    def grid_sample_nan(self, xy: Tensor, img: Tensor, mode='nearest') -> Tuple[Tensor, Tensor]:
-        """ pytorch grid_sample with embedded coordinate normalization and grid nan handling (if a nan is present in xy,
+    def grid_sample_nan(
+        self, xy: Tensor, img: Tensor, mode="nearest"
+    ) -> Tuple[Tensor, Tensor]:
+        """pytorch grid_sample with embedded coordinate normalization and grid nan handling (if a nan is present in xy,
         the output will be nan). Works both with input with shape Bxnx2 and B x n0 x n1 x 2
         xy point that fall outside the image are treated as nan (those which are really close are interpolated using
         border padding mode)
@@ -233,25 +258,38 @@ class MethodWrapper(ABC):
             squeeze_result = False
 
         assert xy.shape[-1] == 2
-        assert xy.dim() == 3 or xy.dim() == 4, f'xy must have 3 or 4 dimensions, got {xy.dim()}'
+        assert (
+            xy.dim() == 3 or xy.dim() == 4
+        ), f"xy must have 3 or 4 dimensions, got {xy.dim()}"
         B, C, H, W = img.shape
 
-        xy_norm = self.normalize_pixel_coordinates(xy, img.shape[-2:])  # BxNx2 or BxN0xN1x2
+        xy_norm = self.normalize_pixel_coordinates(
+            xy, img.shape[-2:]
+        )  # BxNx2 or BxN0xN1x2
         # ? set to nan the point that fall out of the second image
-        xy_norm[(xy_norm < -1) + (xy_norm > 1)] = float('nan')
+        xy_norm[(xy_norm < -1) + (xy_norm > 1)] = float("nan")
         if xy.ndim == 3:
-            sampled = F.grid_sample(img, xy_norm[:, :, None, ...], align_corners=False, mode=mode,
-                                    padding_mode='border').view(B, C, xy.shape[1])  # BxCxN
+            sampled = F.grid_sample(
+                img,
+                xy_norm[:, :, None, ...],
+                align_corners=False,
+                mode=mode,
+                padding_mode="border",
+            ).view(
+                B, C, xy.shape[1]
+            )  # BxCxN
         else:
-            sampled = F.grid_sample(img, xy_norm, align_corners=False, mode=mode, padding_mode='border')  # BxCxN0xN1
+            sampled = F.grid_sample(
+                img, xy_norm, align_corners=False, mode=mode, padding_mode="border"
+            )  # BxCxN0xN1
         # ? points xy that are not nan and have nan img. The sum is just to squash the channel dimension
         mask_img_nan = torch.isnan(sampled.sum(1))  # BxN or BxN0xN1
         # ? set to nan the sampled values for points xy that were nan (grid_sample consider those as (-1, -1))
         xy_invalid = xy_norm.isnan().any(-1)  # BxN or BxN0xN1
         if xy.ndim == 3:
-            sampled[xy_invalid[:, None, :].repeat(1, C, 1)] = float('nan')
+            sampled[xy_invalid[:, None, :].repeat(1, C, 1)] = float("nan")
         else:
-            sampled[xy_invalid[:, None, :, :].repeat(1, C, 1, 1)] = float('nan')
+            sampled[xy_invalid[:, None, :, :].repeat(1, C, 1, 1)] = float("nan")
 
         if squeeze_result:
             img.squeeze_(1)
@@ -260,7 +298,7 @@ class MethodWrapper(ABC):
         return sampled, mask_img_nan
 
     def normalize_pixel_coordinates(self, xy: Tensor, shape: Tuple[int, int]) -> Tensor:
-        """ normalize pixel coordinates from -1 to +1. Being (-1,-1) the exact top left corner of the image
+        """normalize pixel coordinates from -1 to +1. Being (-1,-1) the exact top left corner of the image
         the coordinates must be given in a way that the center of pixel is at half coordinates (0.5,0.5)
         xy ordered as (x, y) and shape ordered as (H, W)
         Args:
@@ -276,3 +314,8 @@ class MethodWrapper(ABC):
         xy_norm[..., 1] = 2 * xy_norm[..., 1] / shape[0]
         xy_norm -= 1
         return xy_norm
+
+    def match(self, des0: List[Tensor], des1: List[Tensor]):
+        if self.matcher is None:
+            raise ValueError("No matcher defined for this wrapper")
+        return self.matcher.match(des0, des1)
