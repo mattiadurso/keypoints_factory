@@ -1,6 +1,8 @@
 import cv2
 import os
+import pandas as pd
 import json
+from pathlib import Path
 import random
 import torch
 import argparse
@@ -191,3 +193,108 @@ def compute_relative_pose(R1, t1, R2, t2):
     rots = R2 @ (R1.T)
     trans = -rots @ t1 + t2
     return rots, trans
+
+
+def display_hpatches_results(
+    results_file="hpatches/results/results.json",
+    partition="overall",
+    method=None,
+    ths=[1, 2, 3],
+    tostring=True,
+):
+    """
+    Display HPatches benchmark results in a formatted DataFrame.
+
+    Args:
+        results_file: Path to the results JSON file
+        partition: Which partition to display ('overall', 'i', 'v')
+        method: Specific method to display (if None, displays all methods)
+        ths: List of thresholds to display (default: [1, 2, 3])
+        tostring: If True, print the DataFrame as a string
+
+    Returns:
+        pandas.DataFrame: Formatted results table
+    """
+    # Load results
+    if isinstance(results_file, str):
+        results_file = Path(results_file)
+
+    if not results_file.exists():
+        raise FileNotFoundError(f"Results file not found: {results_file}")
+
+    with open(results_file, "r") as f:
+        data = json.load(f)
+
+    if not data:
+        print("No results found in the file.")
+        return pd.DataFrame()
+
+    # Filter by specific method if provided
+    if method is not None:
+        if method in data:
+            data = {method: data[method]}
+        else:
+            print(f"Method '{method}' not found in results.")
+            return pd.DataFrame()
+
+    # Create DataFrame
+    rows = []
+
+    for method_key, results in data.items():
+        if partition not in results:
+            continue
+
+        partition_data = results[partition]
+
+        # Base row info
+        row = {
+            "Method": method_key.split("_")[0],  # Extract method name
+        }
+
+        # Add metrics for all thresholds (1, 2, 3) - GROUPED BY METRIC TYPE
+        for thr in ths:
+            # Repeatability
+            rep_key = f"repeatability_{thr}"
+            if rep_key in partition_data:
+                rep_data = partition_data[rep_key]
+                row[f"Rep@{thr}"] = f"{rep_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Matching Accuracy
+            ma_key = f"matching_accuracy_{thr}"
+            if ma_key in partition_data:
+                ma_data = partition_data[ma_key]
+                row[f"MA@{thr}"] = f"{ma_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Matching Score
+            ms_key = f"matching_score_{thr}"
+            if ms_key in partition_data:
+                ms_data = partition_data[ms_key]
+                row[f"MS@{thr}"] = f"{ms_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Homography Accuracy
+            ha_key = f"homography_accuracy_{thr}"
+            if ha_key in partition_data:
+                ha_data = partition_data[ha_key]
+                row[f"HA@{thr}"] = f"{ha_data.get('mean', 0.0)*100:.1f}"
+
+        rows.append(row)
+
+    if not rows:
+        print(f"No results found for partition '{partition}'")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+
+    # Sort by method name for consistent ordering
+    if len(df) > 1:
+        df = df.sort_values(["Method"], ascending=[True])
+
+    # Reset index
+    df.reset_index(drop=True, inplace=True)
+
+    if tostring:
+        print(df.to_string(index=False))
+    return df
