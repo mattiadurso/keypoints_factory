@@ -590,7 +590,7 @@ def compute_matching_stats_homography(
     img1_shape: np.ndarray | Tensor,
     mode: str,
     matches: Tensor = None,
-    px_thrs: float | list[float] = 3.0,
+    px_thrs: float | list[float] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     compute_coverage: bool = True,
     coverage_kernel_size: int = 9,
     evaluate_corner_error: bool = True,
@@ -824,7 +824,7 @@ def compute_matching_stats_homography(
         dist_max_mnn = dist_max[mnn_mask]  # n_mnn
 
         homography_stats_list_keypoints = []
-        for px_thr in [1, 2, 3]:
+        for px_thr in px_thrs:
             distance_mask = dist_max_mnn <= px_thr
             xy0_matched_kpts_thr = xy0_matched_mnn[distance_mask]
             xy1_matched_kpts_thr = xy1_matched_mnn[distance_mask]
@@ -850,6 +850,7 @@ def compute_matching_stats_sequential(
     matches: Dict,
     hpatches: Dict,
     max_kpts: int = 999999,
+    px_thrs: float | list[float] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Original sequential implementation - renamed for clarity"""
     stats_df = pd.DataFrame()
@@ -872,7 +873,7 @@ def compute_matching_stats_sequential(
                     images[i].shape[:2],
                     mode="hpatches",
                     matches=matches_single_pair,
-                    px_thrs=[1, 2, 3],
+                    px_thrs=px_thrs,  # Pass through px_thrs parameter
                     evaluate_corner_error_keypoints=False,
                 )
             )
@@ -973,6 +974,7 @@ def compute_matching_stats(
     hpatches: Dict,
     max_kpts: int = 999999,
     n_jobs: int = 1,  # Default to sequential for backwards compatibility
+    px_thrs: float | list[float] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Compute matching statistics with optional parallelization.
@@ -980,10 +982,14 @@ def compute_matching_stats(
     """
     if n_jobs == 1:
         # Use original sequential implementation
-        return compute_matching_stats_sequential(keypoints, matches, hpatches, max_kpts)
+        return compute_matching_stats_sequential(
+            keypoints, matches, hpatches, max_kpts, px_thrs=px_thrs
+        )
     else:
         logger.info(f"Multi-processing not enabled, using single-threaded execution.")
-        return compute_matching_stats_sequential(keypoints, matches, hpatches, max_kpts)
+        return compute_matching_stats_sequential(
+            keypoints, matches, hpatches, max_kpts, px_thrs=px_thrs
+        )
 
 
 # compute_matching_stats_sequential it reasonably fast (~4m) on its own, maybe i'll add a parallel a version later
