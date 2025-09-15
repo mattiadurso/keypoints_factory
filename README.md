@@ -1,8 +1,8 @@
 # Keypoint Factory
 
-A lightweight factory of local wrappers for feature detection and description. It downloads third-party implementations and exposes a unified interface so it iis possible to test and compare methods quickly. Exact results might slightly change according to different libraries version, hardware or unkown factor apparently.
+A lightweight factory of local wrappers for feature detection and description. It downloads third-party implementations and exposes a unified interface so it is possible to test and compare methods quickly. Exact results might slightly change according to different libraries version, hardware or unkown factor apparently.
 
-Code to dowload and run Megadepth-1500 and the Graz High Reoslution Benchmark is provided in `bash` and `benchmarks` folders, respectively.
+Code to download the benchmarks' data is provided in `bash` folder.
 
 SANDesc is supported but not released yet, thus those parts are commented.
 
@@ -16,12 +16,13 @@ conda env create -f environment.yaml && \
 conda activate keypoint_factory
 ```
 
-### 2) Download the wrappers
+### 2) Download the wrappers and benchmarks
 
-Edit `download_wrappers.py` to choose which method to download. Empty list means all methods listed in `download_wrappers.yaml`. Then run it.
+Edit `download_wrappers.py` to choose which method to download. Empty list means all methods listed in `download_wrappers.yaml`. Then to download benchmarks data and/or code run the following.
 
 ```bash
-python download_wrappers.py
+python download_wrappers.py && \
+bash bash/download_all.sh
 ```
 
 ### 3) Test in the notebook
@@ -49,33 +50,28 @@ Currently the following methods are supported with a wrapper.
 
 #### **DeDoDe**
 - **[Paper](https://arxiv.org/abs/2308.08479)**: Johan Edstedt, Georg Bökman, Mårten Wadenbäck & Michael Felsberg — *DeDoDe: Detect, Don’t Describe — Describe, Don’t Detect for Local Feature Matching* (arXiv 2023)
-- **[Implementation](https://github.com/Parskatt/DeDoDe)**: Parskatt’s GitHub repository with code, training scripts, and pretrained weights :contentReference[oaicite:6]{index=6}
+- **[Implementation](https://github.com/Parskatt/DeDoDe)**: Parskatt’s GitHub repository with code, training scripts, and pretrained weights.
+- **Note:** Both -B and -G descriptor models proposed in the paper are available.
 
 #### **ALIKED**
 - **[Paper](https://arxiv.org/abs/2304.03608)**: Xiaoming Zhao et al. — *ALIKED: A Lighter Keypoint and Descriptor Extraction Network via Deformable Transformation* (2023)
 - **[Implementation](https://github.com/Shiaoming/ALIKED)**: Shiaoming’s GitHub repo for the Python version.
 
-## Results
+## Supported Benchmarks
 
-Here below we report the results when running the benchmarks. We include also results with SANDesc.
+After downloading the target methods, verifying that the wrapper exists and runs correctly, and downloading the benchmark data, the following benchmarks are supported:
 
-### Megadepth-1500
+#### Graz High Resolution Benchmark
+The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature extractors and reconstruction models under high-resolution conditions, where compute and memory limits are most stressed. It contains six urban scenes recorded in 4K at 30 fps (sampled at 1 fps) using pre-calibrated cameras. Sparse reconstructions built with COLMAP achieved a mean reprojection error of \~0.97 px across 1.3M 3D points. After pruning view graphs and filtering pairs, the final benchmark includes 1,866 images and 4,413 image pairs. HRB supports evaluation at three resolutions, namely 4K (3840×2160), QHD (2560×1440), and FHD (1920×1080). Results are computed following the MegaDepth-1500 protocol.
 
-| Method        | AUC@5 (2048) | AUC@10 (2048) | AUC@5 (30k) | AUC@10 (30k) |
-|---------------|--------------|---------------|-------------|--------------|
-| SuperPoint    | 28.9         | 44.9          | 14.4        | 28.5         |
-| ↳ w/ SANDesc  | **42.2**     | **58.6**      | **34.7**    | **52.0**     |
-| DISK          | 34.7         | 51.4          | 42.6        | 57.7         |
-| ↳ w/ SANDesc  | **36.6**     | **54.2**      | **45.1**    | **60.9**     |
-| RIPE          | 42.3         | 58.0          | 37.1        | 53.2         |
-| ↳ w/ SANDesc  | **42.9**     | **58.7**      | **42.4**    | **58.3**     |
-| ALIKED        | 40.7         | 56.6          | 38.2        | 54.2         |
-| ↳ w/ SANDesc  | **43.5**     | **60.1**      | **44.0**    | **59.6**     |
-| DeDoDe-B      | 42.9         | 59.7          | 50.8        | 65.9         |
-| DeDoDe-G      | **46.4**     | **63.2**      | **55.3**    | **70.9**     |
-| ↳ w/ SANDesc  | 45.2         | 61.8          | 52.8        | 67.2         |
+Use the following command to run it.
+```bash
+python benchmarks/graz_high_res/run_ghr.py
+```
 
-### Graz High Resolution Benchmark Results (2048 keypoints)
+Here below we report the results benchmarks. We include also results with SANDesc.
+
+####  Results with a budget of 2048 keypoints
 
 | Method        | AUC@5 (FHD) | AUC@5 (QHD) | AUC@5 (4K) | AUC@10 (FHD) | AUC@10 (QHD) | AUC@10 (4K) |
 |---------------|-------------|-------------|------------|--------------|--------------|-------------|
@@ -90,33 +86,59 @@ Here below we report the results when running the benchmarks. We include also re
 | DeDoDe-B      | 57.1        | OOM         | OOM        | 70.3         | OOM          | OOM         |
 | DeDoDe-G      | 57.3        | OOM         | OOM        | 70.8         | OOM          | OOM         |
 | ↳ w/ SANDesc  | **57.4**    | **56.0**    | **52.0**   | **70.7**     | **69.1**     | **65.3**    |
+------
 
-### Speed Comparison
-The table below compares per image processing time in milliseconds for keypoint detection and description under a budget of 2048 keypoints, and reports the model size, in millions of parameters, in the corresponding column. All images were processed in FHD on an NVIDIA RTX 4090 with 24GB. 
+### MegaDepth-1500
+[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We follow the standard MD1500 evaluation protocol, assigning a score of 180 degrees when fundamental matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, results are computed for all evaluated methods at keypoint budgets of 2K and 30K.
 
-Overall, methods such as DISK, SuperPoint, ALIKED, and RIPE run slower when paired with SANDesc, since all-in-one pipelines reuse intermediate features to compute descriptors, whereas SANDesc operates directly on raw images. 
-By contrast, with the decoupled DeDoDe methods, SANDesc remains competitive: its accuracy matches DeDoDe-G and exceeds DeDoDe-B, while its runtime is close to DeDoDe-B and faster than DeDoDe-G.
-SANDesc alone requires approximately 87 ms on our hardware.
+Use the following command to run it.
+```bash
+python benchmarks/megadepth1500/run_md1500.py
+```
 
-| Method      | Size (M) | Speed Orig (ms) | Speed SANDesc (ms)| VRAM Orig (GB) | VRAM SANDesc (GB) |
-|-------------|----------|-----------------|-----------------|----------------|----------------|
-| DISK        | 0.26     | 62.1 ± 0.1      | 135.2 ± 0.2     | 6.96           | 7.01           |
-| SuperPoint  | 0.30     | 18.3 ± 0.2      | 114.8 ± 0.2     | 3.50           | 7.18           |
-| ALIKED      | 0.32     | 19.3 ± 0.3      | 114.2 ± 0.2     | 3.89           | 5.76           |
-| RIPE        | 0.24     | 175.9 ± 0.2     | 275.0 ± 0.2     | 6.55           | 8.42           |
-| DeDoDe-B    | 15.1     | 181.5 ± 0.1     | 189.0 ± 0.2     | 8.11           | 5.78           |
-| DeDoDe-G    | 323.2    | 316.8 ± 0.4     | 189.0 ± 0.2     | 9.31           | 5.78           |
+------
+
+### HPatches
+[HPatches](https://arxiv.org/abs/1704.05939) is a benchmark of image sequences with viewpoint or illumination changes. We evaluate on 108 scenes, each with one reference and five target images paired by ground-truth homographies, using a fixed budget of 2048 keypoints and MNN for matching. 
 
 
+Use the following command to run it.
+```bash
+python benchmarks/hpatches/run_hpatches.py
+```
 --- 
-### TODO after release
-* [ ] Add more methods. 
-    - maybe also superglue and lightglue
-    - maybe RDD
-    - Maybe add dense methods like loftr, roma, aspanformer, eff loftr etc.
 
 
+### Image Matching Challenge (Phototourism)
+[Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°.
+
+Use the following command to run it.
+```bash
+python benchmarks/imc/run_imc.py
+```
+--- 
+---
+### TODO 
+* [ ] add pretrained kpts in all wrappers
+    - sift
+    - disk
+    - aliked
+    - ripe
+* [ ] double check memory usage in speed table in the paper
+    - when in place, it shoule be able to extract N features, and eventually change matching params from the second run
+* [ ] remove thos two images errors in ghr
+* [ ] add speed and memory testing scripts
+* [ ] add code to run these wrappers to populate colmap database
+* [ ] add eth3D?
+* [ ] add aachen day and night?
+* [ ] re run all tests before make them public?
+* [ ] docuemnt and explain repo logic/functioning
+* [ ] update env file at the end
+* [ ] unify displaying functions names?
 
 ## License and Attribution
 
 This repo provides wrappers around third-party research code and models. Each downloaded project remains under its original license. Please review and comply with the licenses of the respective upstream authors.
+
+Part of the repo is based on [Emanuele Santellani](https://scholar.google.com/citations?user=1JwKYK8AAAAJ&hl=en) work.
+
