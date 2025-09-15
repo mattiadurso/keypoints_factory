@@ -199,7 +199,7 @@ def display_hpatches_results(
     results_file="hpatches/results/results.json",
     partition="overall",
     method=None,
-    ths=[1, 2, 3],
+    ths=None,  # Allow None as default
     tostring=True,
 ):
     """
@@ -209,7 +209,7 @@ def display_hpatches_results(
         results_file: Path to the results JSON file
         partition: Which partition to display ('overall', 'i', 'v')
         method: Specific method to display (if None, displays all methods)
-        ths: List of thresholds to display (default: [1, 2, 3])
+        ths: List of thresholds to display (if None, auto-detect from results)
         tostring: If True, print the DataFrame as a string
 
     Returns:
@@ -237,6 +237,23 @@ def display_hpatches_results(
             print(f"Method '{method}' not found in results.")
             return pd.DataFrame()
 
+    # Auto-detect thresholds if not provided
+    if ths is None:
+        ths = []
+        for method_key, results in data.items():
+            if partition in results:
+                partition_data = results[partition]
+                for key in partition_data.keys():
+                    if key.startswith("repeatability_"):
+                        thr = key.split("_")[-1]
+                        try:
+                            thr_val = int(float(thr))
+                            if thr_val not in ths:
+                                ths.append(thr_val)
+                        except ValueError:
+                            continue
+        ths = sorted(ths) if ths else [1, 2, 3]  # Default fallback
+
     # Create DataFrame
     rows = []
 
@@ -251,7 +268,7 @@ def display_hpatches_results(
             "Method": method_key.split("_")[0],  # Extract method name
         }
 
-        # Add metrics for all thresholds (1, 2, 3) - GROUPED BY METRIC TYPE
+        # Add metrics for all thresholds - GROUPED BY METRIC TYPE
         for thr in ths:
             # Repeatability
             rep_key = f"repeatability_{thr}"
