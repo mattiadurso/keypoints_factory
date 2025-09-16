@@ -29,7 +29,9 @@ bash bash/download_all.sh
 In `demo.ipynb` it is possible to test the wrappers on images from the Graz High Reolution Benchmark visualizing keypoints/matches, and sanity-check that everything works.
 
 
-### Feature Extraction Methods
+
+## Feature Extraction Methods
+
 Currently the following methods are supported with a wrapper.
 
 #### **SIFT**
@@ -51,18 +53,20 @@ Currently the following methods are supported with a wrapper.
 #### **DeDoDe**
 - **[Paper](https://arxiv.org/abs/2308.08479)**: Johan Edstedt, Georg Bökman, Mårten Wadenbäck & Michael Felsberg — *DeDoDe: Detect, Don’t Describe — Describe, Don’t Detect for Local Feature Matching* (arXiv 2023)
 - **[Implementation](https://github.com/Parskatt/DeDoDe)**: Parskatt’s GitHub repository with code, training scripts, and pretrained weights.
-- **Note:** Both -B and -G descriptor models proposed in the paper are available.
+- **Note:** Both -B and -G descriptor models proposed in the paper are available. Repeatability results might slighly change since -G expects images to have edges multple of 14.
 
 #### **ALIKED**
 - **[Paper](https://arxiv.org/abs/2304.03608)**: Xiaoming Zhao et al. — *ALIKED: A Lighter Keypoint and Descriptor Extraction Network via Deformable Transformation* (2023)
 - **[Implementation](https://github.com/Shiaoming/ALIKED)**: Shiaoming’s GitHub repo for the Python version.
 
+
+
 ## Supported Benchmarks
 
 After downloading the target methods, verifying that the wrapper exists and runs correctly, and downloading the benchmark data, the following benchmarks are supported:
 
-#### Graz High Resolution Benchmark
-The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature extractors and reconstruction models under high-resolution conditions, where compute and memory limits are most stressed. It contains six urban scenes recorded in 4K at 30 fps (sampled at 1 fps) using pre-calibrated cameras. Sparse reconstructions built with COLMAP achieved a mean reprojection error of \~0.97 px across 1.3M 3D points. After pruning view graphs and filtering pairs, the final benchmark includes 1,866 images and 4,413 image pairs. HRB supports evaluation at three resolutions, namely 4K (3840×2160), QHD (2560×1440), and FHD (1920×1080). Results are computed following the MegaDepth-1500 protocol.
+### Graz High Resolution Benchmark
+The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature extractors and reconstruction models under high-resolution conditions, where compute and memory limits are most stressed. It contains six urban scenes recorded in 4K at 30 fps (sampled at 1 fps) using pre-calibrated cameras. Sparse reconstructions built with COLMAP achieved a mean reprojection error of \~0.97 px across 1.3M 3D points. After pruning view graphs and filtering pairs, the final benchmark includes 1,866 images and 4,413 image pairs. HRB is run at three resolutions, namely 4K (3840×2160), QHD (2560×1440), and FHD (1920×1080). Results are computed following the MegaDepth-1500 protocol.
 
 Use the following command to run it.
 ```bash
@@ -89,7 +93,7 @@ Here below we report the results benchmarks. We include also results with SANDes
 ------
 
 ### MegaDepth-1500
-[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We follow the standard MD1500 evaluation protocol, assigning a score of 180 degrees when fundamental matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, results are computed for all evaluated methods at keypoint budgets of 2K and 30K.
+[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We follow the standard MD1500 evaluation protocol, assigning a score of 180 degrees when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, results are computed for all evaluated methods at keypoint budgets of 2K and 30K.
 
 Use the following command to run it.
 ```bash
@@ -110,14 +114,16 @@ python benchmarks/hpatches/run_hpatches.py
 
 
 ### Image Matching Challenge (Phototourism)
-[Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°.
+[Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°. 
+
+Despite this benchmark is heavily parallelized, it takes ~1h per method. Nevertheless, it is (arguably) the most complete and exhaustive.
 
 Use the following command to run it.
 ```bash
 python benchmarks/imc/run_imc.py
 ```
 --- 
----
+
 ### TODO 
 * [ ] add pretrained kpts in all wrappers
     - sift
@@ -131,14 +137,14 @@ python benchmarks/imc/run_imc.py
 * [ ] add code to run these wrappers to populate colmap database
 * [ ] add eth3D?
 * [ ] add aachen day and night?
-* [ ] re run all tests before make them public?
-* [ ] docuemnt and explain repo logic/functioning
+* [ ] documwnt and explain repo logic/functioning
 * [ ] update env file at the end
 * [ ] unify displaying functions names?
+* [ ] add what metrics benchmarks compute
 
 ## License and Attribution
 
 This repo provides wrappers around third-party research code and models. Each downloaded project remains under its original license. Please review and comply with the licenses of the respective upstream authors.
 
-Part of the repo is based on [Emanuele Santellani](https://scholar.google.com/citations?user=1JwKYK8AAAAJ&hl=en) work.
+Part of the repo is based on [Emanuele Santellani](https://scholar.google.com/citations?user=1JwKYK8AAAAJ&hl=en)'s work.
 
