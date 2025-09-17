@@ -205,13 +205,16 @@ class MethodWrapper(ABC):
 
     @torch.inference_mode()
     def extract(
-        self, img: Union[Tensor, np.ndarray], max_kpts: Union[float, int]
+        self,
+        img: Union[Tensor, np.ndarray],
+        max_kpts: Union[float, int],
+        custom_kpts=None,
     ) -> MethodOutput:
         if not isinstance(img, Tensor):
             raise TypeError("Input image must be a Tensor")
 
         H, W = img.shape[-2:]  # images is supposed to be (C, H, W) or (B, C, H, W)
-        output = self._extract(img, max_kpts)
+        output = self._extract(img, max_kpts, custom_kpts)
         # ? remove all the points in the border
         valid_mask = (
             (output.kpts[:, 0] > self.border)

@@ -58,7 +58,7 @@ class DeDoDeWrapper(MethodWrapper):
         torch.cuda.empty_cache()
 
     @torch.inference_mode()
-    def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
+    def _extract(self, x, max_kpts: int = 2048, custom_kpts=None) -> MethodOutput:
         x = x if x.dim() == 4 else x[None]
 
         # eventually cropping to multiples of 14
@@ -71,9 +71,13 @@ class DeDoDeWrapper(MethodWrapper):
             device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp
         ):
             # detector
-            out = self.detector.detect(batch, num_keypoints=max_kpts)
-            kpts, scores = out["keypoints"], out["confidence"]
-            kpts_pix = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
+            if custom_kpts is None:
+                out = self.detector.detect(batch, num_keypoints=max_kpts)
+                kpts, scores = out["keypoints"], out["confidence"]
+                kpts_pix = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
+            else:  # use the given custom kpts
+                kpts_pix = custom_kpts.to(x.device)
+                scores = torch.ones(kpts_pix.shape[0], device=x.device)
 
             # descriptors
             if self.custom_descriptor is None:

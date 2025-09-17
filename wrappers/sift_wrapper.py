@@ -6,15 +6,17 @@ from wrappers.wrapper import MethodWrapper, MethodOutput
 
 
 class SIFTPyColmapWrapper(MethodWrapper):
-    def __init__(self, device: str = 'cuda', border=16, sift_opts: dict = None):
+    def __init__(self, device: str = "cuda", border=16, sift_opts: dict = None):
         """
         device: 'cuda' | 'cpu' | 'auto' (pycolmap Device; CUDA build required for GPU)
         sift_opts: dict of pycolmap.SiftExtractionOptions fields (optional)
         """
-        super().__init__(name='sift', border=border, device=device)
-        print('By default, SIFT uses CPU even if CUDA is available. \
+        super().__init__(name="sift", border=border, device=device)
+        print(
+            "By default, SIFT uses CPU even if CUDA is available. \
               To use GPU, install pycolmap with CUDA support.\
-              ')  # https://colmap.github.io/pycolmap/index.html
+              "
+        )  # https://colmap.github.io/pycolmap/index.html
 
         # Build SIFT options (defaults are good; expose a dict for tweaks)
         if sift_opts is None:
@@ -46,7 +48,7 @@ class SIFTPyColmapWrapper(MethodWrapper):
         gray = np.ascontiguousarray(gray.astype(np.uint8))
         return gray
 
-    def _extract(self, x, max_kpts: int = 2048) -> MethodOutput:
+    def _extract(self, x, max_kpts: int = 2048, custom_kpts=None) -> MethodOutput:
         """
         x: CHW torch tensor in [0,1] or [0,255] (H,W multiples of 16 OK).
         Returns MethodOutput with:
@@ -54,6 +56,8 @@ class SIFTPyColmapWrapper(MethodWrapper):
           - kpts_scores: None (pycolmap SIFT doesn't expose scores via extract)
           - des: Tensor [N,128]
         """
+        if custom_kpts is not None:
+            raise NotImplementedError("Custom keypoints not implemented for SIFT.")
         # Ensure 4D -> 3D CHW
         x = x if x.dim() == 3 else x[0]
         gray = self._to_gray_uint8(x)
@@ -73,4 +77,8 @@ class SIFTPyColmapWrapper(MethodWrapper):
         kpts_xy = torch.from_numpy(kpts4[:, :2].copy()).float()
         des_t = torch.from_numpy(des.copy()).float()
 
-        return MethodOutput(kpts=kpts_xy, kpts_scores=None, des=des_t,)
+        return MethodOutput(
+            kpts=kpts_xy,
+            kpts_scores=None,
+            des=des_t,
+        )
