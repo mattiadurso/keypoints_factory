@@ -7,12 +7,23 @@
 # - 3 images in piazza_san_marco
 # I manually fixed this and upload a corrected version downloadable with this script.
 
+
+# validation set
+wget -c -O benchmarks/imc/validation.zip \
+  "https://www.cs.ubc.ca/research/kmyi_data/imc2021-public/imc-2021-validation-phototourism.tar.gz"
+mkdir -p benchmarks/imc/data/phototourism/
+tar -xvzf benchmarks/imc/validation.zip -C benchmarks/imc/data/phototourism/
+rm benchmarks/imc/validation.zip
+
+
+# test set
 wget -c -O benchmarks/imc/phototourism.zip \
   "https://cloud.tugraz.at/index.php/s/AdD9XoXa5fmCWwN/download"
-
+  
 mkdir -p benchmarks/imc/data
-unzip benchmarks/imc/phototourism.zip -d benchmarks/imc/data
+unzip benchmarks/imc/phototourism.zip -d benchmarks/imc/data/phototourism
 rm benchmarks/imc/phototourism.zip
+
 
 # then download imc repo
 mkdir benchmarks/imc/image-matching-benchmark
