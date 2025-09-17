@@ -13,7 +13,7 @@ SANDesc is supported but not released yet, thus those parts are commented.
 ```bash
 # from the repo root
 conda env create -f environment.yaml && \
-conda activate keypoint_factory
+conda activate keypoint_factory # or . ./activate_env.sh if you are lazy
 ```
 
 ### 2) Download the wrappers and benchmarks
@@ -124,23 +124,78 @@ python benchmarks/imc/run_imc.py
 ```
 --- 
 
-### TODO 
-* [ ] add pretrained kpts in all wrappers
-    - sift
-    - disk
-    - aliked
-    - ripe
-* [ ] double check memory usage in speed table in the paper
-    - when in place, it shoule be able to extract N features, and eventually change matching params from the second run
-* [ ] remove thos two images errors in ghr
-* [ ] add speed and memory testing scripts
-* [ ] add code to run these wrappers to populate colmap database
-* [ ] add eth3D?
-* [ ] add aachen day and night?
-* [ ] documwnt and explain repo logic/functioning
+## Repository Logic
+The reason that pushed my to write this repo is I didn't find a unfied piede of code to test feature extractors in an easy and reproducible way. I belive set up the benchmarks shouldn't take too much time from reaserch.
+
+The idea is to wrap a method into a wrapper that serves as interface between the model and the benchmark. This means the former need to provide all the support for input (normalization, cropping/padding, color converting, etc.) producing a standard format output, de facto being transparent to the user. This also easies a lot the usage during benchmark writing, namely one can change the method by changing an argument.
+
+Given so, place your method in `methods`, write the respective wrapper in `wrappers`, and add your method to `wrappers_manager.py`. Then your ready to benchmark it!
+
+Here’s a cleaned-up, README-ready version:
+
+
+
+### Why this repo?
+
+I couldn’t find a single, unified, and reproducible way to **benchmark feature extractors** quickly. Setting up fair benchmarks shouldn’t steal time from research—so this repo aims to make it fast and consistent.
+
+### Core idea
+
+Wrap each method with a **thin adapter** that standardizes I/O between the model and the benchmark:
+
+* The **wrapper** handles everything the model needs for input:
+  normalization, resizing/cropping/padding, color space conversion, etc.
+* It produces a **standard output format**, so benchmarks can treat all methods uniformly.
+* This makes swapping methods trivial—change a single argument instead of rewriting code.
+
+#### How to add your method
+
+1. **Place your implementation** in `methods/`
+2. **Write its wrapper** in `wrappers/`
+
+   * Do all preprocessing here
+   * Return outputs in the repo’s standard format
+3. **Register it** in `wrappers_manager.py`
+
+That’s it—you’re ready to benchmark.
+
+```bash
+# Example with SuperPoint
+python benchmarks/graz_high_res/run_ghr.py --method superpoint
+```
+
+### Benefits
+
+* **Reproducible**: consistent I/O and evaluation across methods
+* **Simple to use**: swap methods via a flag
+* **Extensible**: add new models with small, focused wrappers
+
+
+## TODO 
+
+#### wrappers
+* [x] Custom kpts support added only for DeDoDe and ALIKED.
+
+#### MISC
+* [x] document and explain repo logic/functioning
 * [ ] update env file at the end
-* [ ] unify displaying functions names?
-* [ ] add what metrics benchmarks compute
+* [ ] add what metrics benchmarks compute in read me
+
+#### Notebooks/Results
+* [ ] unify displaying functions names in read results
+
+#### Benchmarks
+* [ ] add scannet
+    - double-check data download
+    - run it
+* [ ] create common class for MD1500, SC1500, GHR
+    - add repeatability (hint:look into DeDoDe code)
+* [ ] Speed/Memory usage 
+    - add
+* [ ] GHR
+    - remove those two images errors in ghr data
+* [ ] Aachen Day/Night
+    - add benchmark
 
 ## License and Attribution
 
