@@ -36,7 +36,7 @@ Currently the following methods are supported with a wrapper.
 
 #### **SIFT**
 - **[Paper](https://en.wikipedia.org/wiki/Scale-invariant_feature_transform)**: David Lowe — *Distinctive Image Features from Scale-Invariant Keypoints*
-- **[Implementation](https://github.com/colmap/pycolmap)**: PyCOLMAP GitHub (provides bindings for extracting/matching SIFT features via Python; supports CPU by default, optional CUDA).
+- **[Implementation](https://github.com/colmap/pycolmap)**: PyCOLMAP (provides bindings for extracting/matching SIFT features via Python; supports CPU by default, optional CUDA).
 
 #### **SuperPoint**
 - **[Paper](https://arxiv.org/abs/1712.07629)**: Daniel DeTone, Tomasz Malisiewicz & Andrew Rabinovich — *SuperPoint: Self-Supervised Interest Point Detection and Description* (CVPR 2018 workshop; arXiv 2017)
@@ -70,7 +70,8 @@ The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature
 
 Use the following command to run it.
 ```bash
-python benchmarks/graz_high_res/run_ghr.py
+python benchmarks/benchmark_parallel.py --benchmark-name ghr # for single test
+python benchmarks/graz_high_res/run.py                       # for battery tests
 ```
 
 Here below we report the results benchmarks. We include also results with SANDesc.
@@ -97,7 +98,23 @@ Here below we report the results benchmarks. We include also results with SANDes
 
 Use the following command to run it.
 ```bash
-python benchmarks/megadepth1500/run_md1500.py
+python benchmarks/benchmark_parallel.py --benchmark-name md  # for single test
+python benchmarks/megadepth1500/run.py                       # for battery tests
+```
+
+------
+### Scannet-1500
+Here’s a concise description for **ScanNet-1500**, modeled after your MD1500 example:
+
+---
+
+[ScanNet-1500](https://arxiv.org/abs/1911.11763) (SC1500) is a curated benchmark derived from the ScanNet dataset, designed to evaluate wide-baseline indoor image matching. Unlike earlier works that select pairs based on temporal proximity or SfM covisibility, SC1500 uses an overlap score computed directly from ground-truth poses and depth, producing significantly more challenging and diverse image pairs. The benchmark consists of 1500 test pairs spanning a range of scene geometries and viewpoints. 
+
+Use the following command to run it.
+```bash
+python benchmarks/benchmark_parallel.py --benchmark-name sc  # for single test
+python benchmarks/scannet1500/run.py                         # for battery tests
+
 ```
 
 ------
@@ -108,7 +125,8 @@ python benchmarks/megadepth1500/run_md1500.py
 
 Use the following command to run it.
 ```bash
-python benchmarks/hpatches/run_hpatches.py
+python benchmarks/hpatches/hpatches_benchmark.py  # for single test
+python benchmarks/hpatches/run_hpatches.py        # for battery tests
 ```
 --- 
 
@@ -120,7 +138,8 @@ Despite this benchmark is heavily parallelized, it takes ~1h per method. Neverth
 
 Use the following command to run it.
 ```bash
-python benchmarks/imc/run_imc.py
+python benchmarks/hpatches/imc_benchmark.py  # for single test
+python benchmarks/imc/run_imc.py             # for battery tests
 ```
 --- 
 
@@ -159,11 +178,6 @@ Wrap each method with a **thin adapter** that standardizes I/O between the model
 
 That’s it—you’re ready to benchmark.
 
-```bash
-# Example with SuperPoint
-python benchmarks/graz_high_res/run_ghr.py --method superpoint
-```
-
 ### Benefits
 
 * **Reproducible**: consistent I/O and evaluation across methods
@@ -173,11 +187,7 @@ python benchmarks/graz_high_res/run_ghr.py --method superpoint
 
 ## TODO 
 
-#### wrappers
-* [x] Custom kpts support added only for DeDoDe and ALIKED.
-
 #### MISC
-* [x] document and explain repo logic/functioning
 * [ ] update env file at the end
 * [ ] add what metrics benchmarks compute in read me
 
@@ -185,14 +195,9 @@ python benchmarks/graz_high_res/run_ghr.py --method superpoint
 * [ ] unify displaying functions names in read results
 
 #### Benchmarks
-* [ ] add scannet
-    - double-check data download
-    - run it
-* [ ] create common class for MD1500, SC1500, GHR
-    - add repeatability (hint:look into DeDoDe code)
+* [ ] add repeatability (hint:look into DeDoDe code)
 * [ ] Speed/Memory usage 
     - add
-* [ ] GHR
     - remove those two images errors in ghr data
 * [ ] Aachen Day/Night
     - add benchmark
