@@ -12,19 +12,20 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import torch
-import pandas as pd
 import time
 import json
-
-import argparse
-from pathlib import Path
-from typing import List
+import torch
 import logging
-from datetime import datetime
-from tqdm.auto import tqdm
+import argparse
+import pandas as pd
 import multiprocessing as mp
+from typing import List
+from pathlib import Path
+from tqdm.auto import tqdm
+from datetime import datetime
 
+
+from matchers.mnn import MNN
 from benchmarks.benchmark_utils import (
     str2bool,
     fix_rng,
@@ -35,8 +36,9 @@ from benchmarks.hpatches.hpatches_benchmark_utils import (
     load_hpatches_in_memory,
     compute_matching_stats,
 )
-from matchers.mnn import MNN
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -198,7 +200,9 @@ class HPatchesBenchmark:
             }
 
             # Add metrics for each threshold
-            for thr in self.thresholds:  # Use self.thresholds instead of hardcoded [1, 2, 3]
+            for (
+                thr
+            ) in self.thresholds:  # Use self.thresholds instead of hardcoded [1, 2, 3]
                 thr_data = category_data[category_data["thr"] == thr]
                 if len(thr_data) == 0:
                     continue

@@ -17,15 +17,14 @@ warnings.filterwarnings("ignore")
 import time
 import torch
 import logging
-import numpy as np
-from torchinfo import summary
-from PIL import Image
-from datetime import datetime
-from tqdm.auto import tqdm
-from joblib import Parallel, delayed, parallel_backend
-from functools import partial
 import argparse
+import numpy as np
 
+from PIL import Image
+from tqdm.auto import tqdm
+from datetime import datetime
+from functools import partial
+from joblib import Parallel, delayed, parallel_backend
 
 from matchers.mnn import MNN
 from benchmarks.benchmark_utils import (
@@ -36,6 +35,7 @@ from benchmarks.benchmark_utils import (
     process_pose_estimation_batch,
 )
 
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -451,6 +451,9 @@ if __name__ == "__main__":
 
         # network = SANDesc(**model).eval().to(device)
         network = SANDescD(**model).eval().to(device)
+
+        from torchinfo import summary
+
         summary(network)
 
         weights = torch.load(custom_desc, weights_only=False)

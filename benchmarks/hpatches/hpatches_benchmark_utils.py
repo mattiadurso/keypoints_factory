@@ -1,17 +1,18 @@
-import logging
 import cv2
 import json
-from pathlib import Path
-from joblib import Parallel, delayed
+import torch
+import logging
 import numpy as np
-import torch as th
-import imageio.v3 as io
-from typing import List, Tuple, Union, Dict
-from torch import Tensor
-from tqdm import tqdm
 import pandas as pd
+from PIL import Image
+from tqdm import tqdm
+from torch import Tensor
+from pathlib import Path
+from typing import Tuple, Dict
+from joblib import Parallel, delayed
 
 # Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +39,7 @@ def load_hpatches_in_memory(base_path):
         img_paths = [Path(f"{k}.ppm") for k in range(1, 7)]
         hom_paths = [Path(f"H_1_{k}") for k in range(1, 7)]
         for j, (img_path, hom_path) in enumerate(zip(img_paths, hom_paths)):
-            img = io.imread(folder / img_path)
+            img = np.array(Image.open(folder / img_path))
             hom = np.loadtxt(folder / hom_path) if j != 0 else np.eye(3)
 
             hpatches[folder.name]["imgs"].append(img)
@@ -139,8 +140,11 @@ def warp_points(
         assert len(img_shape) == 2
 
     # xy_hom = geom.convert_points_to_homogeneous(xy.to(H.dtype))  # B,n,3
-    xy_hom = th.cat(
-        (xy, th.ones((xy.shape[0], xy.shape[1], 1), dtype=xy.dtype, device=xy.device)),
+    xy_hom = torch.cat(
+        (
+            xy,
+            torch.ones((xy.shape[0], xy.shape[1], 1), dtype=xy.dtype, device=xy.device),
+        ),
         dim=2,
     ).to(
         H.dtype
@@ -186,7 +190,7 @@ def compute_homography_corner_error(
     B = H0_1_estimated.shape[0]
     device = H0_1_GT.device
 
-    corners0 = th.tensor(
+    corners0 = torch.tensor(
         [
             [0.0, 0.0],
             [0.0, img0_shape[0]],
@@ -201,16 +205,16 @@ def compute_homography_corner_error(
     # ? compute the corner error in the projected frame
     projected_corners0_GT = warp_points(corners0, H0_1_GT.to(th.double))  # B,4,2
     projected_corners0 = warp_points(corners0, H0_1_estimated.to(th.double))  # B,4,2
-    corner_error = th.norm(projected_corners0_GT - projected_corners0, dim=2).mean(
+    corner_error = torch.norm(projected_corners0_GT - projected_corners0, dim=2).mean(
         1
     )  # B
     # # ? compute the corner error in the img0 frame
     # projected_corners0_GT = warp_points(corners0, H0_1_GT.to(th.double))  # B,4,2
-    # unprojected_corners0 = warp_points(projected_corners0_GT, th.inverse(H0_1_estimated.to(th.double)))  # B,4,2
-    # corner_error = th.norm(corners0 - unprojected_corners0, dim=2).mean(1)  # B
+    # unprojected_corners0 = warp_points(projected_corners0_GT, torch.inverse(H0_1_estimated.to(th.double)))  # B,4,2
+    # corner_error = torch.norm(corners0 - unprojected_corners0, dim=2).mean(1)  # B
 
     if img1_shape is not None:
-        corners1 = th.tensor(
+        corners1 = torch.tensor(
             [
                 [0.0, 0.0],
                 [0.0, img1_shape[0]],
@@ -223,25 +227,25 @@ def compute_homography_corner_error(
         )  # B,4,2
         # ? compute the corner error in the projected frame
         projected_corners1_GT = warp_points(
-            corners1, th.inverse(H0_1_GT.to(th.double))
+            corners1, torch.inverse(H0_1_GT.to(th.double))
         )  # B,4,2
         projected_corners1 = warp_points(
-            corners1, th.inverse(H0_1_estimated.to(th.double))
+            corners1, torch.inverse(H0_1_estimated.to(th.double))
         )  # B,4,2
-        corner_error_1 = th.norm(
+        corner_error_1 = torch.norm(
             projected_corners1_GT - projected_corners1, dim=2
         ).mean(
             1
         )  # B
         # # ? compute the corner error in the img1 frame
-        # projected_corners1_GT = warp_points(corners1, th.inverse(H0_1_GT.to(th.double)))  # B,4,2
+        # projected_corners1_GT = warp_points(corners1, torch.inverse(H0_1_GT.to(th.double)))  # B,4,2
         # unprojected_corners1 = warp_points(projected_corners1_GT, H0_1_estimated.to(th.double))  # B,4,2
-        # corner_error_1 = th.norm(corners1 - unprojected_corners1, dim=2).mean(1)  # B
+        # corner_error_1 = torch.norm(corners1 - unprojected_corners1, dim=2).mean(1)  # B
 
         corner_error = 0.5 * (corner_error + corner_error_1)  # B
 
     # # ? remove all the values smaller than a threshold
-    # corner_error = th.div(corner_error, 1e-3, rounding_mode='floor') * 1e-3
+    # corner_error = torch.div(corner_error, 1e-3, rounding_mode='floor') * 1e-3
 
     return corner_error
 
@@ -301,8 +305,8 @@ def compute_corner_error(
                 "valid_homography": False,
                 "ransac_thr": ransac_thr,
                 "corner_error": float("inf"),
-                "homography": th.ones((3, 3), device=device) * float("nan"),
-                "mask": th.zeros(xy0_matched.shape[0], dtype=th.bool, device=device),
+                "homography": torch.ones((3, 3), device=device) * float("nan"),
+                "mask": torch.zeros(xy0_matched.shape[0], dtype=th.bool, device=device),
                 "n_matched_keypoints": xy0_matched.shape[0],
                 "n_ransac_inliers": 0,
             }
@@ -317,8 +321,8 @@ def compute_corner_error(
             "valid_homography": False,
             "ransac_thr": ransac_thr,
             "corner_error": float("inf"),
-            "homography": th.ones((3, 3), device=device) * float("nan"),
-            "mask": th.zeros(xy0_matched.shape[0], dtype=th.bool, device=device),
+            "homography": torch.ones((3, 3), device=device) * float("nan"),
+            "mask": torch.zeros(xy0_matched.shape[0], dtype=th.bool, device=device),
             "n_ransac_inliers": 0,
         }
 
@@ -335,11 +339,11 @@ def compute_corner_error(
         ]  # n_valid
         if H0_1_valid_list:
             mask_list: list[Tensor] = [
-                th.tensor(mask_list[i], dtype=th.bool, device=device)
+                torch.tensor(mask_list[i], dtype=th.bool, device=device)
                 for i in range(len(mask_list))
                 if H0_1_estimated_list[i] is not None
             ]  # list of n_valid Tensors of different shapes
-            H0_1_estimated: Tensor = th.tensor(
+            H0_1_estimated: Tensor = torch.tensor(
                 np.array(H0_1_estimated_list), dtype=th.float, device=device
             )  # n_valid,3,3
             if mode == "symmetric":
@@ -401,14 +405,14 @@ def find_distance_matrices_between_points_and_their_projections(
 
     # ? compute the distance between all the reprojected points
     # # ? low memory usage, slow but correct
-    # dist0 = th.cdist(xy0.to(th.float), xy1_proj,         compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
-    # dist1 = th.cdist(xy0_proj,         xy1.to(th.float), compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
+    # dist0 = torch.cdist(xy0.to(th.float), xy1_proj,         compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
+    # dist1 = torch.cdist(xy0_proj,         xy1.to(th.float), compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
     # ? high memory usage, fast and correct
     dist0 = (xy0[:, None, :] - xy1_proj[None, :, :]).norm(dim=2)  # n0,n1
     dist1 = (xy0_proj[:, None, :] - xy1[None, :, :]).norm(dim=2)  # n0,n1
     # # ? low memory usage, fast but non-deterministic
-    # dist0 = th.cdist(xy0.to(th.float), xy1_proj)  # n0,n1
-    # dist1 = th.cdist(xy0_proj,         xy1.to(th.float))  # n0,n1
+    # dist0 = torch.cdist(xy0.to(th.float), xy1_proj)  # n0,n1
+    # dist1 = torch.cdist(xy0_proj,         xy1.to(th.float))  # n0,n1
     dist0[dist0.isnan()] = float("+inf")
     dist1[dist1.isnan()] = float("+inf")
     return dist0, dist1
@@ -479,28 +483,28 @@ def find_mutual_nearest_neighbors_from_keypoints_and_their_projections(
         # ? find the closest point in the image between each xy0 and xy1_proj
         xy0_closest_dist, closest0 = dist0.min(1)
     else:
-        xy0_closest_dist, closest0 = th.zeros((0,), device=device), th.zeros(
+        xy0_closest_dist, closest0 = torch.zeros((0,), device=device), torch.zeros(
             (0,), dtype=th.long, device=device
         )  # n0
     if n0 > 0:
         # ? find the closest point in the image between each xy1 and xy0_proj
         xy1_closest_dist, closest1 = dist1.min(0)
     else:
-        xy1_closest_dist, closest1 = th.zeros((0,), device=device), th.zeros(
-            (0,), dtype=th.long, device=device
+        xy1_closest_dist, closest1 = torch.zeros((0,), device=device), torch.zeros(
+            (0,), dtype=torch.long, device=device
         )  # n1
 
-    xy0_closest_matrix = th.zeros(dist0.shape, dtype=th.bool, device=device)
-    xy1_closest_matrix = th.zeros(dist0.shape, dtype=th.bool, device=device)
+    xy0_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
+    xy1_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
     if n1 > 0:
         xy0_closest_matrix[th.arange(len(xy0)), closest0] = True
     if n0 > 0:
-        xy1_closest_matrix[closest1, th.arange(len(xy1))] = True
+        xy1_closest_matrix[closest1, torch.arange(len(xy1))] = True
     # ? fink the keypoints that are mutual nearest neighbors (using only x,y coordinates) in both images
     mnn_mask = xy0_closest_matrix & xy1_closest_matrix
     mnn_idx = mnn_mask.nonzero()
-    xy0_closest_dist_mnn = th.ones_like(xy0_closest_dist) * float("inf")
-    xy1_closest_dist_mnn = th.ones_like(xy1_closest_dist) * float("inf")
+    xy0_closest_dist_mnn = torch.ones_like(xy0_closest_dist) * float("inf")
+    xy1_closest_dist_mnn = torch.ones_like(xy1_closest_dist) * float("inf")
     xy0_closest_dist_mnn[mnn_idx[:, 0]] = xy0_closest_dist[mnn_idx[:, 0]]
     xy1_closest_dist_mnn[mnn_idx[:, 1]] = xy1_closest_dist[mnn_idx[:, 1]]
     return (
@@ -541,24 +545,24 @@ def compute_coverages(
     if not isinstance(px_thrs, list):
         px_thrs = [px_thrs]
 
-    coverage = th.zeros(len(px_thrs), device=device)
-    coverage_per_kpt = th.zeros(len(px_thrs), device=device)
+    coverage = torch.zeros(len(px_thrs), device=device)
+    coverage_per_kpt = torch.zeros(len(px_thrs), device=device)
     for i, px_thr in enumerate(px_thrs):
         xy0_inlier = xy0[(dist1 <= px_thr).any(1)]
         xy1_inlier = xy1[(dist0 <= px_thr).any(0)]
-        ij0 = th.flip(xy0_inlier.to(th.long), [-1])
-        ij1 = th.flip(xy1_inlier.to(th.long), [-1])
-        img0 = th.zeros(img0_shape, device=device)
-        img1 = th.zeros(img1_shape, device=device)
+        ij0 = torch.flip(xy0_inlier.to(th.long), [-1])
+        ij1 = torch.flip(xy1_inlier.to(th.long), [-1])
+        img0 = torch.zeros(img0_shape, device=device)
+        img1 = torch.zeros(img1_shape, device=device)
         img0[ij0[:, 0], ij0[:, 1]] = 1
         img1[ij1[:, 0], ij1[:, 1]] = 1
-        img0 = th.max_pool2d(
+        img0 = torch.max_pool2d(
             img0[None, None, ...],
             (coverage_kernel_size, coverage_kernel_size),
             stride=1,
             padding=coverage_kernel_size // 2,
         )[0, 0, ...]
-        img1 = th.max_pool2d(
+        img1 = torch.max_pool2d(
             img1[None, None, ...],
             (coverage_kernel_size, coverage_kernel_size),
             stride=1,
@@ -689,13 +693,13 @@ def compute_matching_stats_homography(
         matches = (
             matches.to(device)
             if matches is not None
-            else th.zeros((0, 2), dtype=th.long, device=device)
+            else torch.zeros((0, 2), dtype=th.long, device=device)
         )
     except:
         matches = (
             matches[0].to(device)
             if matches is not None
-            else th.zeros((0, 2), dtype=th.long, device=device)
+            else torch.zeros((0, 2), dtype=th.long, device=device)
         )
 
     if not isinstance(px_thrs, list):
@@ -707,8 +711,8 @@ def compute_matching_stats_homography(
 
     # ? project the points from one image to the other, nan if a keypoints project out of the image
     xy0_proj = warp_points(xy0[None], H0_1[None], img1_shape)[0].to(th.float)  # n0 x 2
-    xy1_proj = warp_points(xy1[None], th.inverse(H0_1)[None], img0_shape)[0].to(
-        th.float
+    xy1_proj = warp_points(xy1[None], torch.inverse(H0_1)[None], img0_shape)[0].to(
+        torch.float
     )  # n1 x 2
 
     # ? number of keypoints that are in the overlap area
@@ -719,7 +723,7 @@ def compute_matching_stats_homography(
         xy0, xy1, xy0_proj, xy1_proj
     )
 
-    dist_max = th.max(dist0, dist1)
+    dist_max = torch.max(dist0, dist1)
     mnn_mask, xy0_dist_mnn, xy1_dist_mnn, xy0_dist, xy1_dist = (
         find_mutual_nearest_neighbors_from_keypoints_and_their_projections(
             xy0, xy1, xy0_proj, xy1_proj, dist0, dist1
@@ -733,11 +737,11 @@ def compute_matching_stats_homography(
     xy1_proj_matched = xy1_proj[matches[:, 1]]  # nm x 2
 
     # ? distance between the matched keypoints only
-    dist_matched0 = th.linalg.norm(xy0_matched - xy1_proj_matched, dim=1)  # nm
-    dist_matched1 = th.linalg.norm(xy0_proj_matched - xy1_matched, dim=1)  # nm
+    dist_matched0 = torch.linalg.norm(xy0_matched - xy1_proj_matched, dim=1)  # nm
+    dist_matched1 = torch.linalg.norm(xy0_proj_matched - xy1_matched, dim=1)  # nm
     dist_matched0[dist_matched0.isnan()] = float("+inf")
     dist_matched1[dist_matched1.isnan()] = float("+inf")
-    dist_matched_max = th.max(dist_matched0, dist_matched1)  # nm
+    dist_matched_max = torch.max(dist_matched0, dist_matched1)  # nm
 
     matching_matrix_proposed = two_vector_idxs_to_matching_matrix(matches, n0, n1)
 
@@ -869,7 +873,7 @@ def compute_matching_stats_sequential(
                 compute_matching_stats_homography(
                     kpts[0],
                     kpts[i],
-                    th.from_numpy(homographies[i]),
+                    torch.from_numpy(homographies[i]),
                     images[0].shape[:2],
                     images[i].shape[:2],
                     mode="hpatches",

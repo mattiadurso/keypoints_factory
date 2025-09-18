@@ -1,29 +1,31 @@
 import sys
 from pathlib import Path
+from tkinter import Image
 
 abs_root_path = Path(__file__).parent.parent
 sys.path.append(str(abs_root_path))
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 import os
-import pandas as pd
-import h5py
 import glob
+import h5py
 import json
+import logging
 import subprocess
-import imageio.v3 as io
+import pydegensac
 import torch as th
 import numpy as np
-import pydegensac
+import pandas as pd
+from PIL import Image
+from torch import Tensor
+from tqdm.auto import tqdm
 from functools import partial
 from typing import Union, Dict
-from tqdm.auto import tqdm
-from torch import Tensor
 from itertools import combinations
 from joblib import Parallel, delayed
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 validation_scenes = ["reichstag", "sacre_coeur", "st_peters_square"]
 test_scenes = [
@@ -95,7 +97,7 @@ def extract_image_matching_benchmark(
         imgs_bar = tqdm(imgs_paths, position=1)
         for img_path in imgs_bar:
             img_name = img_path.stem
-            img_np = io.imread(img_path)
+            img_np = np.array(Image.open(img_path))
             with th.no_grad():
                 img = wrapper.img_from_numpy(img_np)
                 output = wrapper.extract(img, max_kpts=max_kpts)

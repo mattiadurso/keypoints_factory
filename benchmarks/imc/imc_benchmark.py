@@ -8,21 +8,11 @@ from pathlib import Path
 abs_root_path = Path(__file__).parents[2]
 sys.path.append(str(abs_root_path))
 
-import warnings
-
-warnings.filterwarnings("ignore")
-
 import gc
 import torch
 import logging
-import numpy as np
-import pandas as pd
-from PIL import Image
-from datetime import datetime
-from tqdm.auto import tqdm
 
 from matchers.mnn import MNN
-from benchmarks.benchmark_utils import print_metrics
 from benchmarks.imc.imc_benchmark_utils import (
     extract_image_matching_benchmark,
     match_features,
@@ -30,6 +20,8 @@ from benchmarks.imc.imc_benchmark_utils import (
     run_benchmark,
 )
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -155,7 +147,6 @@ class IMC21MNNBenchmark:
 
 
 if __name__ == "__main__":
-    import json
     import argparse
     from wrappers_manager import wrappers_manager
 

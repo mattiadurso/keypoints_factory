@@ -10,16 +10,17 @@ from pathlib import Path
 abs_root_path = Path(__file__).parents[2]
 sys.path.append(str(abs_root_path))
 
-import time
-import json
 import glob
-import pynvml
-from PIL import Image
-import numpy as np
+import json
+import time
 import torch
-from tqdm import tqdm
+import pynvml
 import logging
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
 
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,6 @@ def get_vram_usage(gpu_index=0):
     handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
     mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
     return mem_info.used / 1024**2  # MB
-
-
-# Example usage
-print(f"Current VRAM usage: {get_vram_usage():.2f} MB")
 
 
 def measure(
