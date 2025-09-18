@@ -68,6 +68,14 @@ After downloading the target methods, verifying that the wrapper exists and runs
 ### Graz High Resolution Benchmark
 The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature extractors and reconstruction models under high-resolution conditions, where compute and memory limits are most stressed. It contains six urban scenes recorded in 4K at 30 fps (sampled at 1 fps) using pre-calibrated cameras. Sparse reconstructions built with COLMAP achieved a mean reprojection error of \~0.97 px across 1.3M 3D points. After pruning view graphs and filtering pairs, the final benchmark includes 1,866 images and 4,413 image pairs. HRB is run at three resolutions, namely 4K (3840×2160), QHD (2560×1440), and FHD (1920×1080). Results are computed following the MegaDepth-1500 protocol.
 
+The benchmark computes the following metrics.
+- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
+  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°, 20°).  
+  A pose is correct if both translation and rotation errors are below the threshold.
+
+- **Number of Inliers**  
+  The raw count of inlier correspondences found during pose estimation.
+
 Use the following command to run it.
 ```bash
 python benchmarks/benchmark_parallel.py --benchmark-name ghr # for single test
@@ -96,6 +104,8 @@ Here below we report the results benchmarks. We include also results with SANDes
 ### MegaDepth-1500
 [MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We follow the standard MD1500 evaluation protocol, assigning a score of 180 degrees when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, results are computed for all evaluated methods at keypoint budgets of 2K and 30K.
 
+The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
+
 Use the following command to run it.
 ```bash
 python benchmarks/benchmark_parallel.py --benchmark-name md  # for single test
@@ -110,6 +120,8 @@ Here’s a concise description for **ScanNet-1500**, modeled after your MD1500 e
 
 [ScanNet-1500](https://arxiv.org/abs/1911.11763) (SC1500) is a curated benchmark derived from the ScanNet dataset, designed to evaluate wide-baseline indoor image matching. Unlike earlier works that select pairs based on temporal proximity or SfM covisibility, SC1500 uses an overlap score computed directly from ground-truth poses and depth, producing significantly more challenging and diverse image pairs. The benchmark consists of 1500 test pairs spanning a range of scene geometries and viewpoints. 
 
+The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
+
 Use the following command to run it.
 ```bash
 python benchmarks/benchmark_parallel.py --benchmark-name sc  # for single test
@@ -121,6 +133,22 @@ python benchmarks/scannet1500/run.py                         # for battery tests
 
 ### HPatches
 [HPatches](https://arxiv.org/abs/1704.05939) is a benchmark of image sequences with viewpoint or illumination changes. We evaluate on 108 scenes, each with one reference and five target images paired by ground-truth homographies, using a fixed budget of 2048 keypoints and MNN for matching. 
+
+The benchmark computes the following metrics.
+- **Repeatabilty**  
+  Ratio of repeated keypoints between an image pair after applying the known homography, relative to the smaller number of keypoints detected in the two images.
+
+- **Mean Matching Accuracy**  
+  Percentage of matches whose reprojection error is within ε pixels.  
+  Reported at 1, 2, and 3 pixel thresholds.
+
+- **Matching Score**  
+  Ratio of correct matches (within pixel threshold) to the average number of keypoints in the overlapping image area.
+
+- **Homography Accuracy (AUC)**  
+  Area under the curve of the percentage of estimated homographies whose corner error is below ε.  
+  Corner error = average distance between the four reference corners and the warped target corners.  
+  The best score across multiple RANSAC thresholds is reported.
 
 
 Use the following command to run it.
@@ -135,6 +163,17 @@ python benchmarks/hpatches/run_hpatches.py        # for battery tests
 [Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°. 
 
 Despite this benchmark is heavily parallelized, it takes ~1h per method. Nevertheless, it is (arguably) the most complete and exhaustive.
+
+Between the metrics compute by the benchmark, usually oen find in lietarture the following.
+- **Repeatabilty**  
+  Ratio of repeated keypoints between an image pair after applying the known homography, relative to the smaller number of keypoints detected in the two images. Usually with a threshold of 3 pixels.
+
+- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
+  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°, 20°).  
+  A pose is correct if both translation and rotation errors are below the threshold.
+
+- **Number of Inliers**  
+  The raw count of inlier correspondences found during pose estimation.
 
 Use the following command to run it.
 ```bash
@@ -189,18 +228,18 @@ That’s it—you’re ready to benchmark.
 
 #### MISC
 * [ ] update env file at the end
-* [ ] add what metrics benchmarks compute in read me
 
 #### Notebooks/Results
 * [ ] unify displaying functions names in read results
 
 #### Benchmarks
-* [ ] add repeatability (hint:look into DeDoDe code)
-* [ ] Speed/Memory usage 
-    - add
-    - remove those two images errors in ghr data
+* [ ] add repeatability in benchmark_parallel.py (hint:look into DeDoDe code)
+    - this should be the fraction of keypoints that when projected fall with a l2 distance of th pixels wrt to gt (bidirectionally).
+    thus project kpts1 in image 2 and check if at least one px is in radius of th.
 * [ ] Aachen Day/Night
     - add benchmark
+* [ ] add support for matchers (LoFTR, RoMA, etc)
+* [ ] reduce dependencies / use methods from kornia (mnn, disk, dedode)
 
 ## License and Attribution
 
