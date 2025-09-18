@@ -1,5 +1,6 @@
 import logging
 import cv2
+import json
 from pathlib import Path
 from joblib import Parallel, delayed
 import numpy as np
@@ -992,4 +993,131 @@ def compute_matching_stats(
         )
 
 
-# compute_matching_stats_sequential it reasonably fast (~4m) on its own, maybe i'll add a parallel a version later
+def display_hpatches_results(
+    results_file="hpatches/results/results.json",
+    partition="overall",
+    method=None,
+    ths=None,  # Allow None as default
+    tostring=True,
+):
+    """
+    Display HPatches benchmark results in a formatted DataFrame.
+
+    Args:
+        results_file: Path to the results JSON file
+        partition: Which partition to display ('overall', 'i', 'v')
+        method: Specific method to display (if None, displays all methods)
+        ths: List of thresholds to display (if None, auto-detect from results)
+        tostring: If True, print the DataFrame as a string
+
+    Returns:
+        pandas.DataFrame: Formatted results table
+    """
+    # Load results
+    if isinstance(results_file, str):
+        results_file = Path(results_file)
+
+    if not results_file.exists():
+        raise FileNotFoundError(f"Results file not found: {results_file}")
+
+    with open(results_file, "r") as f:
+        data = json.load(f)
+
+    if not data:
+        print("No results found in the file.")
+        return pd.DataFrame()
+
+    # Filter by specific method if provided
+    if method is not None:
+        if method in data:
+            data = {method: data[method]}
+        else:
+            print(f"Method '{method}' not found in results.")
+            return pd.DataFrame()
+
+    # Auto-detect thresholds if not provided
+    if ths is None:
+        ths = []
+        for method_key, results in data.items():
+            if partition in results:
+                partition_data = results[partition]
+                for key in partition_data.keys():
+                    if key.startswith("repeatability_"):
+                        thr = key.split("_")[-1]
+                        try:
+                            thr_val = int(float(thr))
+                            if thr_val not in ths:
+                                ths.append(thr_val)
+                        except ValueError:
+                            continue
+        ths = sorted(ths) if ths else [1, 2, 3]  # Default fallback
+
+    # Create DataFrame
+    rows = []
+
+    for method_key, results in data.items():
+        if partition not in results:
+            continue
+
+        partition_data = results[partition]
+
+        # Base row info
+        if "+" in method_key:
+            method_name, custom_desc_part = method_key.split("+", 1)
+            custom_desc = custom_desc_part.split("_")[0]
+        else:
+            method_name = method_key.split("_")[0]
+            custom_desc = ""
+
+        row = {
+            "Method": method_name,
+            "Custom Desc": custom_desc,
+        }
+
+        # Add metrics for all thresholds - GROUPED BY METRIC TYPE
+        for thr in ths:
+            # Repeatability
+            rep_key = f"repeatability_{thr}"
+            if rep_key in partition_data:
+                rep_data = partition_data[rep_key]
+                row[f"Rep@{thr}"] = f"{rep_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Matching Accuracy
+            ma_key = f"matching_accuracy_{thr}"
+            if ma_key in partition_data:
+                ma_data = partition_data[ma_key]
+                row[f"MA@{thr}"] = f"{ma_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Matching Score
+            ms_key = f"matching_score_{thr}"
+            if ms_key in partition_data:
+                ms_data = partition_data[ms_key]
+                row[f"MS@{thr}"] = f"{ms_data.get('mean', 0.0)*100:.1f}"
+
+        for thr in ths:
+            # Homography Accuracy
+            ha_key = f"homography_accuracy_{thr}"
+            if ha_key in partition_data:
+                ha_data = partition_data[ha_key]
+                row[f"HA@{thr}"] = f"{ha_data.get('mean', 0.0)*100:.1f}"
+
+        rows.append(row)
+
+    if not rows:
+        print(f"No results found for partition '{partition}'")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+
+    # Sort by method name for consistent ordering
+    if len(df) > 1:
+        df = df.sort_values(["Method", "Custom Desc"], ascending=[True, True])
+
+    # Reset index
+    df.reset_index(drop=True, inplace=True)
+
+    if tostring:
+        print(df.to_string(index=False))
+    return df
