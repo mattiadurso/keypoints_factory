@@ -130,7 +130,9 @@ class Benchmark:
         # Get all unique images
         unique_images = set()
         for pair in self.pairs_calibrated:
-            img1, img2, _, _, _, _ = parse_pair(pair)
+            img1, img2, _, _, _, _ = parse_pair(
+                pair, benchmark_name=self.benchmark_name
+            )
             unique_images.add(img1)
             unique_images.add(img2)
 
@@ -199,7 +201,9 @@ class Benchmark:
         # Prepare all pair data
         pair_data = []
         for pair in self.pairs_calibrated:
-            img1, img2, K1, K2, R, t = parse_pair(pair)
+            img1, img2, K1, K2, R, t = parse_pair(
+                pair, benchmark_name=self.benchmark_name
+            )
             pair_data.append(((img1, img2), K1, K2, R, t))
 
         # Create matcher
@@ -323,7 +327,7 @@ class Benchmark:
         acc_20 = (tot_e_pose < 20).mean()
 
         return {
-            "inlier": np.mean(inliers),
+            "inlier": round(np.mean(inliers)),
             "auc_5": round(auc[0] * 100, 1),
             "auc_10": round(auc[1] * 100, 1),
             "auc_20": round(auc[2] * 100, 1),
