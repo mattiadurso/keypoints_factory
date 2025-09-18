@@ -28,7 +28,6 @@ from benchmarks.imc.imc_benchmark_utils import (
     match_features,
     import_data_to_benchmark,
     run_benchmark,
-    parse_results,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +44,7 @@ class IMC21MNNBenchmark:
         max_kpts: int = 2048,
         overwrite_extraction: bool = False,
         njobs: int = 16,
+        scene_set: str = "test",
     ) -> None:
         """
         Args:
@@ -62,9 +62,14 @@ class IMC21MNNBenchmark:
         self.max_kpts = max_kpts
         self.overwrite_extraction = overwrite_extraction
         self.njobs = njobs
+        self.scene_set = scene_set
 
         # Matcher
-        self.matcher = MNN(ratio_test=ratio_test, min_score=min_score, device=device)
+        self.matcher = MNN(
+            ratio_test=ratio_test,
+            min_score=min_score,
+            device="cpu",  # one can also use cuda here. With cpu, gpu stays free.
+        )
 
     @torch.no_grad()
     def benchmark(self, wrapper):
@@ -78,12 +83,13 @@ class IMC21MNNBenchmark:
         Returns:
             tuple: (results_dict, timestamp)
         """
+
         method_name = f"{wrapper.name}_{self.max_kpts}kpts"
 
         # Step 1: Extract features and store them
         output_path = (
             abs_root_path
-            / f"benchmarks/imc/to_import_imc/{wrapper.name}_{self.max_kpts}kpts"
+            / f"benchmarks/imc/to_import_imc/{self.scene_set}/{wrapper.name}_{self.max_kpts}kpts"
         )
         os.makedirs(output_path, exist_ok=True)
 
@@ -94,12 +100,21 @@ class IMC21MNNBenchmark:
                 logger.info(f"Features in {output_path} have been removed.")
 
             extract_image_matching_benchmark(
-                wrapper, self.data_path, max_kpts=self.max_kpts, output_path=output_path
+                wrapper=wrapper,
+                data_path=self.data_path,
+                max_kpts=self.max_kpts,
+                output_path=output_path,
+                scene_set=self.scene_set,
             )
         elif output_path.exists() and any(output_path.iterdir()):
             logger.info(
                 f"Features already extracted in {output_path}. Skipping extraction."
             )
+
+        # free gpu memory, from here wtrapper is not needed anymore
+        del wrapper
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # Step 2: Match them
         # If already matched, will return the path.
@@ -116,20 +131,27 @@ class IMC21MNNBenchmark:
         # Step 3: Import to the IMC benchmark
         import_data_to_benchmark(
             matched_features_path,
-            scenes_set="test",
+            scenes_set=self.scene_set,
             matcher_name=self.matcher.name,
         )
         logger.info("Data imported to the IMC benchmark.")
 
         method_name_json = run_benchmark(
-            method_name, self.matcher.name, scenes_set="test"
+            method_name, self.matcher.name, scenes_set=self.scene_set
         )
-        logger.info(f"Method name for the json: {method_name_json}")
 
-        # results = parse_results(method_name_json, scenes_set="test")
-        # logger.info(f"Results for {method_name}: {results}")
+        # Step 4: Copy results to the results folder
+        results_path = abs_root_path / f"benchmarks/imc/results/{self.scene_set}"
+        os.makedirs(results_path, exist_ok=True)
+        os.system(
+            f"cp \
+                  benchmarks/imc/image-matching-benchmark/packed-{self.scene_set}/{method_name_json}.json \
+                  {results_path / method_name_json}.json"
+        )
 
-        return {}, ""
+        logger.info(
+            f"{method_name_json} results copyed to benchmarks/imc/results. \n\n"
+        )
 
 
 if __name__ == "__main__":
@@ -146,12 +168,13 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--wrapper-name", type=str, default="superpoint")
     parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--max-kpts", type=int, default=2048)
+    parser.add_argument("--th", type=float, default=1.0)
     parser.add_argument("--ratio-test", type=float, default=1.0)
     parser.add_argument("--min-score", type=float, default=0.0)
-    parser.add_argument("--max-kpts", type=int, default=2048)
-    parser.add_argument("--th", type=float, default=0.5)
     parser.add_argument("--custom-desc", type=str, default=None)
-    parser.add_argument("--njobs", type=int, default=16)
+    parser.add_argument("--njobs", type=int, default=8)
+    parser.add_argument("--scene-set", type=str, default="test")
     parser.add_argument(
         "--overwrite-extraction",
         action="store_true",
@@ -192,7 +215,7 @@ if __name__ == "__main__":
         weights = torch.load(custom_desc, weights_only=False)
         network.load_state_dict(weights["state_dict"])
         wrapper.add_custom_descriptor(network)
-        wrapper.name = f"{wrapper.name}+SANDesc"
+        wrapper.name = f"{wrapper.name}SANDesc"
         print(f"Using custom descriptors from {custom_desc}.\n")
 
     # matcher params
@@ -204,24 +227,6 @@ if __name__ == "__main__":
 
     print(f"\n>>> Running benchmark for {key} <<<\n")
 
-    # create if not exists
-    results_path = Path("benchmarks/imc/results")
-    os.makedirs(results_path, exist_ok=True)
-
-    if not os.path.exists(results_path / "results.json"):
-        with open(results_path / "results.json", "w") as f:
-            json.dump({}, f)
-        f.close()
-
-    with open(results_path / "results.json", "r") as f:
-        data = json.load(f)
-
-    if key in data:
-        results = data[key]
-        warnings.warn("A similar run already exists.", UserWarning)
-
-    f.close()
-
     # Define the benchmark
     benchmark = IMC21MNNBenchmark(
         ratio_test=ratio_test,
@@ -231,15 +236,9 @@ if __name__ == "__main__":
         overwrite_extraction=args.overwrite_extraction,
         device=device,
         njobs=njobs,
+        scene_set=args.scene_set,
     )
 
     # Run the benchmark
-    results, timestamp = benchmark.benchmark(wrapper)
-    print_metrics(wrapper, results)
+    benchmark.benchmark(wrapper)
     print("-------------------------------------------------------------")
-
-    # Save the results
-    data[f"{key} {timestamp}"] = results
-    with open(results_path / "results.json", "w") as f:
-        json.dump(data, f, indent=4)
-    print(f"Results saved to {results_path / 'results.json'}")

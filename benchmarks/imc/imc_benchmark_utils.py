@@ -25,6 +25,19 @@ from torch import Tensor
 from itertools import combinations
 from joblib import Parallel, delayed
 
+validation_scenes = ["reichstag", "sacre_coeur", "st_peters_square"]
+test_scenes = [
+    "british_museum",
+    "florence_cathedral_side",
+    "lincoln_memorial_statue",
+    "london_bridge",
+    "milan_cathedral",
+    "mount_rushmore",
+    "piazza_san_marco",
+    "sagrada_familia",
+    "st_pauls_cathedral",
+]
+
 
 def save_h5(dict_to_save: Dict[str, Tensor], filename: str) -> None:
     """Saves dictionary to HDF5 file"""
@@ -48,12 +61,14 @@ def extract_image_matching_benchmark(
     data_path: str = "benchmarks/imc/data/phototourism",
     max_kpts: int = 2048,
     output_path: str = None,
+    scene_set: str = "test",
 ) -> Union[Path, None]:
 
     data_path = Path(data_path)
     assert data_path.exists(), f"Dataset path {data_path} does not exist."
 
-    scenes_paths = sorted(list(data_path.iterdir()))
+    scenes = validation_scenes if scene_set == "val" else test_scenes
+    scenes_paths = sorted([data_path / scene for scene in scenes])
 
     # Create the phototourism subdirectory to match expected structure
     phototourism_path = output_path / "phototourism"
@@ -328,7 +343,9 @@ def generate_json(method_name: str, matcher_name: str = None):
     return output_path, method_name_json
 
 
-def run_benchmark(method_name: str, matcher_name: str, scenes_set: str) -> str:
+def run_benchmark(
+    method_name: str, matcher_name: str, scenes_set: str, multiview: bool = False
+) -> str:
     json_path, method_name_json = generate_json(method_name, matcher_name)
     subprocess.call(
         [
@@ -337,100 +354,17 @@ def run_benchmark(method_name: str, matcher_name: str, scenes_set: str) -> str:
             "--json_method",
             json_path,
             "--subset",
-            f"{scenes_set}",
+            scenes_set,
             "--run_mode",
             "interactive",
             "--eval_multiview",
-            "false",
+            str(multiview).lower(),
             "--parallel",
             "1",
         ],
         cwd=abs_root_path / "imc/image-matching-benchmark",
     )
     return method_name_json
-
-
-def parse_results(
-    method_name_json: str, scenes_set: str = "val", only_phototourism: bool = True
-):
-    match = "matcher" in method_name_json
-
-    results = []
-    for covisibility_thr in [0.1, 0.6]:
-        stereo_stats_to_read = [
-            ("avg_num_keypoints", ".0f"),
-            (f"repeatability_th_{covisibility_thr   :.1f}", ".2f"),
-            (f"num_matches_matcher_th_{covisibility_thr   :.1f}", ".0f"),
-            (f"num_matches_geom_th_{covisibility_thr   :.1f}", ".0f"),
-            (
-                f"matching_scores_depth_projection_pre_match_th_{covisibility_thr   :.1f}",
-                ".2f",
-            ),
-            (f"qt_auc_05_th_{covisibility_thr   :.1f}", ".2f"),
-            (f"qt_auc_10_th_{covisibility_thr   :.1f}", ".2f"),
-        ]
-
-        results_path = (
-            Path("benchmarks/imc/image-matching-benchmark/json")
-            / f"packed-{scenes_set}"
-        )
-        results_path.mkdir(parents=True, exist_ok=True)
-        f = open(results_path / f"{method_name_json}.json")
-
-        data = json.load(f)
-
-        logger.info("\nSCENE ORDER")
-        scene_types = (
-            ["phototourism"] if only_phototourism else ["phototourism", "pragueparks"]
-        )
-
-        logger.info("\nSTEREO STATS")
-        for stat_to_read, _ in stereo_stats_to_read:
-            logger.info(stat_to_read)
-
-        logger.info("\nRESULTS")
-        texts = []
-        for stat_to_read, precision in stereo_stats_to_read:
-            for scene_type in scene_types:
-                scenes = sorted(list(data[scene_type]["results"].keys()))
-                for scene in scenes:
-                    # ? skip the already averaged results
-                    if scene == "allseq":
-                        continue
-                    scene_data = data[scene_type]["results"][scene]
-                    value = scene_data["stereo"]["run_avg"][stat_to_read]["mean"]
-                    if isinstance(value, list):
-                        # ? get the value relative to 3px error
-                        texts += [f"{value[2]:{precision}}"]
-                    else:
-                        texts += [f"{value:{precision}}"]
-                if scenes_set == "test":
-                    texts += [""]
-        logger.info(f"Results at covisibility threshold {covisibility_thr}")
-        # ? add some empty commas to account for the pre or post ransac matches
-        if match:
-            if scenes_set == "test":
-                # ? skip also the proposed matches
-                empties = [""] * 10
-                texts = texts[:20] + empties + texts[30:40] + empties + texts[40:]
-            else:
-                empties = [""] * 3
-                texts = (
-                    texts[:6]
-                    + [""]
-                    + empties
-                    + texts[9:12]
-                    + empties
-                    + texts[12:15]
-                    + [""]
-                    + texts[15:]
-                )
-        else:
-            raise NotImplementedError
-        text = ",".join(texts)
-        logger.info(text)
-        results.append(f"results at covisibility {covisibility_thr:.1f}: {text}")
-    return results
 
 
 def load_imc_results(
@@ -461,6 +395,9 @@ def load_imc_results(
         "piazza_san_marco": "PS",
         "sagrada_familia": "SA",
         "st_pauls_cathedral": "SPC",
+        "reichstag": "RE",
+        "sacre_coeur": "SC",
+        "st_peters_square": "SPS",
     }
     if all_scenes:
         scene_short.update(scenes)
@@ -468,6 +405,9 @@ def load_imc_results(
     df_results = {}
 
     paths = glob.glob(res_path + "/*.json")
+    if len(paths) == 0:
+        print(f"No JSON files found in {res_path}.")
+        return
 
     for path in paths:
         with open(path) as f:
@@ -476,7 +416,11 @@ def load_imc_results(
             res_phototourism = res["phototourism"]["results"]
 
             # method name
-            method_config = res["config"]["config_common"]["keypoint"]
+            method_config = (
+                res["config"]["config_common"]["keypoint"]
+                .replace("dedode-g", "dedodeG")
+                .replace("sandesc", "+SANDesc")
+            )
 
             method_data = {}
 
@@ -524,6 +468,18 @@ def load_imc_results(
         df_split["method"] = df_split["index_parts"].apply(
             lambda x: x[0] if len(x) > 0 else ""
         )
+        df_split["custom_desc"] = df_split["index_parts"].apply(
+            lambda x: (
+                "SANDesc"
+                if any("sandesc" in part.lower() for part in x)
+                else ("G" if any("G" in part for part in x) else "")
+            )
+        )
+        # resome +sandesc from method name
+        df_split["method"] = df_split["method"].str.replace("+sandesc", "", case=False)
+        df_split["method"] = df_split["method"].str.replace("+SANDesc", "", case=False)
+        df_split["method"] = df_split["method"].str.replace("G", "", case=False)
+
         df_split["kpts_budget"] = df_split["index_parts"].apply(
             lambda x: x[1] if len(x) > 1 else ""
         )
@@ -532,11 +488,13 @@ def load_imc_results(
         )
 
         # Drop unnecessary columns and reorder
-        df = df_split.drop(["index", "index_parts"], axis=1)
+        df = df_split.drop(["index"], axis=1)
 
         # Group columns by metric type
         metric_cols = [
-            col for col in df.columns if col not in ["method", "kpts_budget", "params"]
+            col
+            for col in df.columns
+            if col not in ["method", "custom_desc", "kpts_budget", "params"]
         ]
 
         # Sort scenes for consistent ordering
@@ -546,15 +504,12 @@ def load_imc_results(
         rep_cols = [
             f"{scene}_rep" for scene in scene_order if f"{scene}_rep" in metric_cols
         ]
-
-        # Only get the AUC columns for the specified threshold
         auc_suffix = f"auc{auc_th}"
         auc_cols = [
             f"{scene}_{auc_suffix}"
             for scene in scene_order
             if f"{scene}_{auc_suffix}" in metric_cols
         ]
-
         inliers_cols = [
             f"{scene}_inliers"
             for scene in scene_order
@@ -563,13 +518,18 @@ def load_imc_results(
 
         # Reorder columns: method info first, then grouped metrics
         column_order = (
-            ["method", "kpts_budget", "params"] + rep_cols + inliers_cols + auc_cols
+            ["method", "custom_desc", "kpts_budget", "params"]
+            + rep_cols
+            + inliers_cols
+            + auc_cols
         )
         df = df[column_order]
 
         # Set simple integer index
         df.index = range(len(df))
 
-        return df
+        return df.sort_values(
+            by=["method", "custom_desc"], ascending=[True, True]
+        ).reset_index(drop=True)
 
     return df_results
