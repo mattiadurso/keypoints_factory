@@ -8,6 +8,61 @@ import torch
 import argparse
 import numpy as np
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def process_pose_estimation_batch(pair_matches_data, th, worker_seed=None):
+    """Process pose estimation for a batch of pairs."""
+    fix_rng(42)
+
+    results = []
+
+    for (img1, img2), matches, kpts1, kpts2, K1, K2, R, t in pair_matches_data:
+        try:
+            if len(matches) < 5:
+                results.append((img1, img2, 180, 180, 180, 0))
+                continue
+
+            # Get matched keypoints
+            matched_kpts1 = kpts1[matches[:, 0]]
+            matched_kpts2 = kpts2[matches[:, 1]]
+
+            # Shuffle matches
+            shuffling = np.random.permutation(len(matched_kpts1))
+            matched_kpts1 = matched_kpts1[shuffling]
+            matched_kpts2 = matched_kpts2[shuffling]
+
+            # Pose estimation
+            threshold = th
+            norm_threshold = threshold / (
+                np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2]))
+            )
+
+            R_est, t_est, mask = estimate_pose(
+                matched_kpts1, matched_kpts2, K1, K2, norm_threshold, conf=0.99999
+            )
+
+            T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)
+            e_t, e_R = compute_pose_error(T1_to_2_est, R, t)
+            e_pose = min(10, max(e_t, e_R))
+            num_inliers = np.sum(mask)
+
+            results.append((img1, img2, e_t, e_R, e_pose, num_inliers))
+            logger.debug(
+                f"Pair ({img1}, {img2}): e_t={e_t:.2f}, e_R={e_R:.2f}, e_pose={e_pose:.2f}, inliers={num_inliers}"
+            )
+
+        except Exception as e:
+            results.append((img1, img2, 180, 180, 180, 0))
+            # results.append((scene_name, pair_id, img1, img2, 180, 180, 180, 0))
+
+            logging.debug(f"Error processing pair ({img1}, {img2}): {e}")
+
+    return results
+
 
 def convert_numpy_types(obj):
     """Convert numpy types to native Python types for JSON serialization."""
@@ -193,125 +248,3 @@ def compute_relative_pose(R1, t1, R2, t2):
     rots = R2 @ (R1.T)
     trans = -rots @ t1 + t2
     return rots, trans
-
-
-def display_hpatches_results(
-    results_file="hpatches/results/results.json",
-    partition="overall",
-    method=None,
-    ths=None,  # Allow None as default
-    tostring=True,
-):
-    """
-    Display HPatches benchmark results in a formatted DataFrame.
-
-    Args:
-        results_file: Path to the results JSON file
-        partition: Which partition to display ('overall', 'i', 'v')
-        method: Specific method to display (if None, displays all methods)
-        ths: List of thresholds to display (if None, auto-detect from results)
-        tostring: If True, print the DataFrame as a string
-
-    Returns:
-        pandas.DataFrame: Formatted results table
-    """
-    # Load results
-    if isinstance(results_file, str):
-        results_file = Path(results_file)
-
-    if not results_file.exists():
-        raise FileNotFoundError(f"Results file not found: {results_file}")
-
-    with open(results_file, "r") as f:
-        data = json.load(f)
-
-    if not data:
-        print("No results found in the file.")
-        return pd.DataFrame()
-
-    # Filter by specific method if provided
-    if method is not None:
-        if method in data:
-            data = {method: data[method]}
-        else:
-            print(f"Method '{method}' not found in results.")
-            return pd.DataFrame()
-
-    # Auto-detect thresholds if not provided
-    if ths is None:
-        ths = []
-        for method_key, results in data.items():
-            if partition in results:
-                partition_data = results[partition]
-                for key in partition_data.keys():
-                    if key.startswith("repeatability_"):
-                        thr = key.split("_")[-1]
-                        try:
-                            thr_val = int(float(thr))
-                            if thr_val not in ths:
-                                ths.append(thr_val)
-                        except ValueError:
-                            continue
-        ths = sorted(ths) if ths else [1, 2, 3]  # Default fallback
-
-    # Create DataFrame
-    rows = []
-
-    for method_key, results in data.items():
-        if partition not in results:
-            continue
-
-        partition_data = results[partition]
-
-        # Base row info
-        row = {
-            "Method": method_key.split("_")[0],  # Extract method name
-        }
-
-        # Add metrics for all thresholds - GROUPED BY METRIC TYPE
-        for thr in ths:
-            # Repeatability
-            rep_key = f"repeatability_{thr}"
-            if rep_key in partition_data:
-                rep_data = partition_data[rep_key]
-                row[f"Rep@{thr}"] = f"{rep_data.get('mean', 0.0)*100:.1f}"
-
-        for thr in ths:
-            # Matching Accuracy
-            ma_key = f"matching_accuracy_{thr}"
-            if ma_key in partition_data:
-                ma_data = partition_data[ma_key]
-                row[f"MA@{thr}"] = f"{ma_data.get('mean', 0.0)*100:.1f}"
-
-        for thr in ths:
-            # Matching Score
-            ms_key = f"matching_score_{thr}"
-            if ms_key in partition_data:
-                ms_data = partition_data[ms_key]
-                row[f"MS@{thr}"] = f"{ms_data.get('mean', 0.0)*100:.1f}"
-
-        for thr in ths:
-            # Homography Accuracy
-            ha_key = f"homography_accuracy_{thr}"
-            if ha_key in partition_data:
-                ha_data = partition_data[ha_key]
-                row[f"HA@{thr}"] = f"{ha_data.get('mean', 0.0)*100:.1f}"
-
-        rows.append(row)
-
-    if not rows:
-        print(f"No results found for partition '{partition}'")
-        return pd.DataFrame()
-
-    df = pd.DataFrame(rows)
-
-    # Sort by method name for consistent ordering
-    if len(df) > 1:
-        df = df.sort_values(["Method"], ascending=[True])
-
-    # Reset index
-    df.reset_index(drop=True, inplace=True)
-
-    if tostring:
-        print(df.to_string(index=False))
-    return df
