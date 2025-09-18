@@ -173,7 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("--ratio-test", type=float, default=1.0)
     parser.add_argument("--min-score", type=float, default=0.0)
     parser.add_argument("--custom-desc", type=str, default=None)
-    parser.add_argument("--njobs", type=int, default=8)
+    parser.add_argument("--njobs", type=int, default=18)
     parser.add_argument("--scene-set", type=str, default="test")
     parser.add_argument(
         "--overwrite-extraction",
