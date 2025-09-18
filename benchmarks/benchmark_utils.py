@@ -119,25 +119,32 @@ def fix_rng(seed=42):
     random.seed(seed)
 
 
-def parse_pair(pair):
+def parse_pair(pair, benchmark_name):
     """Parse a line from a .pairs file"""
-    parts = pair.strip().split()
-    img1, img2 = parts[0], parts[1]
-    nums = list(map(float, parts[2:]))
+    if benchmark_name in ["megadepth1500", "graz_high_res"]:
+        # Pose is stores as "... flat(R) flat(t)""
+        parts = pair.strip().split()
+        img1, img2 = parts[0], parts[1]
+        nums = list(map(float, parts[2:]))
 
-    K1 = np.array(nums[0:9]).reshape(3, 3)
-    K2 = np.array(nums[9:18]).reshape(3, 3)
-    R = np.array(nums[18:27]).reshape(3, 3)
-    t = np.array(nums[27:30]).reshape(3, 1)
+        K1 = np.array(nums[0:9]).reshape(3, 3)
+        K2 = np.array(nums[9:18]).reshape(3, 3)
+        R = np.array(nums[18:27]).reshape(3, 3)
+        t = np.array(nums[27:30]).reshape(3, 1)
 
-    # # build E and F
-    # tx = np.array([[0, -t[2,0], t[1,0]],
-    #                [t[2,0], 0, -t[0,0]],
-    #                [-t[1,0], t[0,0], 0]])
-    # E = tx @ R
-    # F = np.linalg.inv(K2).T @ E @ np.linalg.inv(K1)
+    elif benchmark_name in ["scannet1500"]:
+        # Pose is stored as a "... flat(P)" with P = [R|t;0 0 0 1]
+        parts = pair.strip().split()
+        img1, img2 = parts[0], parts[1]
+        nums = list(map(float, parts[2:]))
+        K1 = np.array(nums[0:9]).reshape(3, 3)
+        K2 = np.array(nums[9:18]).reshape(3, 3)
+        P = np.array(nums[18:34]).reshape(4, 4)
+        R = P[:3, :3]
+        t = P[:3, 3:].reshape(3, 1)
 
-    # return img1, img2, K1, K2, R, t, E, F
+    else:
+        raise ValueError(f"Unknown benchmark name: {benchmark_name}")
 
     return img1, img2, K1, K2, R, t
 
@@ -146,7 +153,6 @@ def print_metrics(wrapper, metrics: dict):
     """Pretty print metrics from a benchmark wrapper"""
     print(f"\nEvaluation results for {wrapper.name}:")
     for k, v in metrics.items():
-        v = v if k == "inlier" else v * 100
         print(f"{k:<8}: {v:.1f}")
 
 
