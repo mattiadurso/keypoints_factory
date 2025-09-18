@@ -114,10 +114,6 @@ python benchmarks/megadepth1500/run.py                       # for battery tests
 
 ------
 ### Scannet-1500
-Here’s a concise description for **ScanNet-1500**, modeled after your MD1500 example:
-
----
-
 [ScanNet-1500](https://arxiv.org/abs/1911.11763) (SC1500) is a curated benchmark derived from the ScanNet dataset, designed to evaluate wide-baseline indoor image matching. Unlike earlier works that select pairs based on temporal proximity or SfM covisibility, SC1500 uses an overlap score computed directly from ground-truth poses and depth, producing significantly more challenging and diverse image pairs. The benchmark consists of 1500 test pairs spanning a range of scene geometries and viewpoints. 
 
 The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
