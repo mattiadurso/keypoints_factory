@@ -33,7 +33,6 @@ for wrapper_name in wrappers_list:
         --th {th} --min-score {min_score} --ratio-test {ratio_test} --multiview {multiview} \
         --scene-set {scene_set} --custom-desc sandesc_models/{wrapper_name}/final.pth"
     )
-    i += 1  # <--- increment after running
 
 os.system("rm -rf benchmarks/imc/benchmark-results")  # heavy files and not needed
 os.system("rm -rf benchmarks/imc/benchmark-visualization")  # I don't use them
