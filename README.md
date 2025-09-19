@@ -156,7 +156,7 @@ python benchmarks/hpatches/run_hpatches.py        # for battery tests
 
 
 ### Image Matching Challenge (Phototourism)
-[Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°. 
+[Image Matching Challenge 2021](https://github.com/ubc-vision/image-matching-benchmark) (IMC) evaluates local feature matching in complex real-world settings. We use the Phototourism test set, which contains nine scenes of 100 tourist photos each, captured under diverse cameras, viewpoints, and lighting. Images within a scene are exhaustively compared, and evaluation follows the official protocol: pose accuracy is measured using the AUC of relative pose error at a 5° threshold, with failures assigned when error exceeds 10°. Currently only the stereo matching is supported, both at 2048 and 8000 keypoints budgets.
 
 Despite this benchmark is heavily parallelized, it takes ~1h per method. Nevertheless, it is (arguably) the most complete and exhaustive.
 
@@ -165,7 +165,7 @@ Between the metrics compute by the benchmark, usually oen find in lietarture the
   Ratio of repeated keypoints between an image pair after applying the known homography, relative to the smaller number of keypoints detected in the two images. Usually with a threshold of 3 pixels.
 
 - **Area Under the Curve of the Relative Pose Estimation (AUC)**  
-  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°, 20°).  
+  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°).  
   A pose is correct if both translation and rotation errors are below the threshold.
 
 - **Number of Inliers**  
@@ -229,13 +229,14 @@ That’s it—you’re ready to benchmark.
 * [ ] unify displaying functions names in read results
 
 #### Benchmarks
-* [ ] add repeatability in benchmark_parallel.py (hint:look into DeDoDe code)
-    - this should be the fraction of keypoints that when projected fall with a l2 distance of th pixels wrt to gt (bidirectionally).
-    thus project kpts1 in image 2 and check if at least one px is in radius of th.
+* [ ] add depth maps to GHR
+* [ ] add view.txt to GHR
 * [ ] Aachen Day/Night
     - add benchmark
 * [ ] add support for matchers (LoFTR, RoMA, etc)
-* [ ] reduce dependencies / use methods from kornia (mnn, disk, dedode)
+* [ ] IMC
+    - add multiview support, now only stereo
+
 
 ## License and Attribution
 
