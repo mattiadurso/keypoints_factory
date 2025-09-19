@@ -10,6 +10,53 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def parse_poses(poses_file, benchmark_name):
+    """Parse poses from a given file based on the benchmark format."""
+    if benchmark_name in ["megadepth1500", "graz_high_res"]:
+        return parse_md1500_poses(poses_file)
+    elif benchmark_name in ["scannet1500"]:
+        # Implement parse_scannet1500_poses if needed
+        raise NotImplementedError("Parsing for scannet1500 not implemented yet.")
+    else:
+        raise ValueError(f"Unknown benchmark name: {benchmark_name}")
+
+
+def parse_md1500_poses(poses_file):
+
+    with open(poses_file, "r") as f:
+        lines = f.readlines()
+
+    view_dict = {}
+    for line in lines:
+        if line[0] == "#":
+            continue
+        elems = line.split()
+        img_path = elems[0]
+        R = np.array(elems[1:10], dtype=float).reshape(3, 3)
+        t = np.array(elems[10:13], dtype=float).reshape(3, 1)
+        camera_model = elems[13]
+        image_size = np.array(elems[14:16], dtype=int)
+        K_ = np.array(elems[16:], dtype=float)  # fx, fy, cx, cy
+        K = np.eye(3)
+        K[0, 0] = K_[0]
+        K[1, 1] = K_[1]
+        K[0, 2] = K_[2]
+        K[1, 2] = K_[3]
+        P = np.vstack((np.hstack((R, t)), np.array([0, 0, 0, 1.0]).reshape(1, 4)))
+
+        view_dict[img_path] = {
+            "img_path": img_path,
+            "K": torch.from_numpy(K),
+            "R": torch.from_numpy(R),
+            "t": torch.from_numpy(t),
+            "P": torch.from_numpy(P),
+            "camera_model": camera_model,
+            "image_size": image_size,
+        }
+
+    return view_dict
+
+
 def process_pose_estimation_batch(pair_matches_data, th, worker_seed=None):
     """Process pose estimation for a batch of pairs."""
     fix_rng(42)
