@@ -65,8 +65,8 @@ def compute_repeatabilities_from_kpts(
         len(image_names_list) == kpts1.shape[0]
     ), f"image_names_list must have the same length as the batch size, got {len(image_names_list)} and {kpts1.shape[0]}."
 
-    kpts12 = reproject_2D_2D(kpts1, Z1, P1, P2, K1, K2, img2_shape)[0]  # B,n,2
-    kpts21 = reproject_2D_2D(kpts2, Z2, P2, P1, K2, K1, img1_shape)[0]  # B,n,2
+    kpts12 = reproject_2D_2D(kpts1, Z1, P1, P2, K1, K2, img2_shape)  # B,n,2
+    kpts21 = reproject_2D_2D(kpts2, Z2, P2, P1, K2, K1, img1_shape)  # B,n,2
 
     reps = {}
     for b, img_name in enumerate(image_names_list):
@@ -600,7 +600,7 @@ def reproject_2D_2D(
         xy0: xy points in img0 (with convention top-left pixel coordinate (0.5, 0.5)
             B,n,2
         depthmap0: depthmap of img0
-            B,H,W
+            B,H,W or B,n
         P0: camera0 extrinsics matrix
             B,4,4
         P1: camera1 extrinsics matrix
@@ -622,9 +622,16 @@ def reproject_2D_2D(
             B,n  bool
     """
     # ? interpolate depths
-    selected_depths0, mask_invalid_depth0 = grid_sample_nan(
-        xy0, depthmap0, mode=mode
-    )  # Bxn, Bxn
+    if depthmap0.dim() == 3:
+        selected_depths0, mask_invalid_depth0 = grid_sample_nan(
+            xy0, depthmap0, mode=mode
+        )  # Bxn, Bxn
+    else:
+        # pre-sampled depths
+        assert (
+            depthmap0.shape == xy0.shape[:2]
+        ), f"If depthmap0 is not BxHxW, it must be Bxn, got {depthmap0.shape} and {xy0.shape}"
+        selected_depths0 = depthmap0
 
     # ? use the depth to define the 3D coordinates of points in the ref system of camera0
     xyz0 = unproject_to_3D(xy0, K0, selected_depths0)  # B,n,3
@@ -637,12 +644,8 @@ def reproject_2D_2D(
         xy0_proj, mask_outside0 = project_to_2D(
             xyz0_proj, K1, img1_shape, border
         )  # B,n,2, B,n,2
-        return xy0_proj, mask_invalid_depth0, mask_outside0
+        return xy0_proj
     else:
         assert border == 0, "border must be 0 if img1_shape is not provided"
         xy0_proj = project_to_2D(xyz0_proj, K1)  # B,n,2, B,n,2
-        return (
-            xy0_proj,
-            mask_invalid_depth0,
-            torch.ones_like(mask_invalid_depth0, dtype=torch.bool),
-        )
+        return xy0_proj
