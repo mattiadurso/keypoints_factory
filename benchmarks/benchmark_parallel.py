@@ -14,6 +14,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import h5py
 import time
 import torch
 import logging
@@ -33,6 +34,7 @@ from benchmarks.benchmark_utils import (
     print_metrics,
     pose_auc,
     process_pose_estimation_batch,
+    parse_poses,
 )
 
 # Setup logging
@@ -56,6 +58,7 @@ class Benchmark:
         keypoints_path: str = None,
         descriptors_path: str = None,
         compute_repeatability: bool = False,
+        px_thrs: list = [1, 3, 5],
     ):
         self.benchmark_name = benchmark_name
         self.dataset_path = dataset_path
@@ -70,13 +73,15 @@ class Benchmark:
         self.keypoints_path = keypoints_path
         self.descriptors_path = descriptors_path
         self.compute_repeatability = compute_repeatability
+        self.px_thrs = px_thrs
 
-        logger.info(f"Benchmark: {self.benchmark_name}")
+        s = " with repeatability computation" if self.compute_repeatability else ""
+        logger.info(f"Benchmark {self.benchmark_name}{s}.")
 
         # Load pairs
         self.dataset_path = abs_root / self.dataset_path
         with open(self.dataset_path / "pairs_calibrated.txt", "r") as f:
-            self.pairs_calibrated = f.read().splitlines()
+            self.pairs_calibrated = f.read().splitlines()  # limit for quick testing
 
         if self.ghr_partial:
             scene = "graz_main_square"  # small scene for quick testing
@@ -85,6 +90,10 @@ class Benchmark:
 
         if dataset_name.lower() == "megadepth1500":
             self.images_path = self.dataset_path / "images"
+            self.depths_path = self.dataset_path / "depths"
+            self.poses_path = self.dataset_path / "views.txt"
+            self.views_dict = parse_poses(self.poses_path, self.benchmark_name)
+
         elif dataset_name.lower() == "scannet1500":
             self.images_path = self.dataset_path
         elif dataset_name.lower() == "graz_high_res":
@@ -106,19 +115,19 @@ class Benchmark:
             self.descriptors_dict = torch.load(
                 descriptors_path, map_location="cpu", weights_only=False
             )
-            print(
+            logger.info(
                 f"Using precomputed features from {keypoints_path} and {descriptors_path}"
             )
         else:
             self.keypoints_dict = None
             self.descriptors_dict = None
-            print("Will extract features using wrapper")
+            logger.info("Will extract features using wrapper")
 
         self.compute_repeatability = compute_repeatability
 
     def extract_features_with_wrapper(self, wrapper):
         """Extract features using the wrapper."""
-        print("\nExtracting features using wrapper...")
+        logger.info("Extracting features using wrapper...")
 
         keypoints_dict = {}
         descriptors_dict = {}
@@ -149,8 +158,9 @@ class Benchmark:
 
                 with torch.no_grad():
                     out = wrapper.extract(img, self.max_kpts)
-                    keypoints_dict[img_path] = out.kpts.cpu()
-                    descriptors_dict[img_path] = out.des.cpu()
+
+                keypoints_dict[img_path] = out.kpts.cpu()
+                descriptors_dict[img_path] = out.des.cpu()
 
             except Exception as e:
                 logger.info(f"Error processing {img_path}: {e}")
@@ -168,16 +178,14 @@ class Benchmark:
         keypoints_file = intermediate_path / "keypoints.pt"
         descriptors_file = intermediate_path / "descriptors.pt"
 
-        print(f"Saving features to {intermediate_path}")
         torch.save(keypoints_dict, keypoints_file)
         torch.save(descriptors_dict, descriptors_file)
 
-        print(f"Features saved: {keypoints_file} and {descriptors_file}")
+        logger.info(f"Features saved: {keypoints_file} and {descriptors_file}")
         return keypoints_file, descriptors_file
 
     def batch_match_all_pairs(self, wrapper, device="cuda", save_key=None):
         """Match all pairs in batch mode."""
-        print("\nStarting unique images feature extraction...")
 
         # Get features (either precomputed or extract with wrapper)
         if self.use_precomputed:
@@ -207,7 +215,6 @@ class Benchmark:
 
         # Batch matching
         matches_dict = {}
-        print("\nPerforming matching...")
 
         for (img1, img2), K1, K2, R, t in tqdm(pair_data, desc="Matching pairs"):
             # Get features
@@ -235,11 +242,64 @@ class Benchmark:
                 "t": t,
             }
 
-        return matches_dict
+        # First naive implementation of repeatability computation
+        # next: sample depth in keypoints and batch
+        if self.compute_repeatability:
+            from rep_utils import compute_repeatabilities_from_kpts
+
+            rep_results = {
+                **{f"rep_{int(pix)}": [] for pix in self.px_thrs},
+                **{f"rep_mnn_{int(pix)}": [] for pix in self.px_thrs},
+            }
+            for pair in tqdm(pair_data, desc="Repeatability"):
+                img1, img2 = pair[:1][0]
+                kpts1 = keypoints_dict[img1]
+                K1 = self.views_dict[img1]["K"]
+                P1 = self.views_dict[img1]["P"]
+                img1_size = self.views_dict[img1]["image_size"]
+                Z1_path = self.depths_path / f"{img1.split('.')[0]}.h5"
+                Z1 = torch.tensor(
+                    h5py.File(Z1_path, "r")["depth"][()], device=device
+                ).float()
+                img1_size = self.views_dict[img1]["image_size"]
+
+                kpts2 = keypoints_dict[img2]
+                K2 = self.views_dict[img2]["K"]
+                P2 = self.views_dict[img2]["P"]
+                img2_size = self.views_dict[img2]["image_size"]
+                Z2_path = self.depths_path / f"{img2.split('.')[0]}.h5"
+                Z2 = torch.tensor(
+                    h5py.File(Z2_path, "r")["depth"][()], device=device
+                ).float()
+                img2_size = self.views_dict[img2]["image_size"]
+
+                rep = compute_repeatabilities_from_kpts(
+                    kpts1[None].float().to(device),
+                    kpts2[None].float().to(device),
+                    K1[None].float().to(device),
+                    K2[None].float().to(device),
+                    Z1[None].float().to(device),
+                    Z2[None].float().to(device),
+                    P1[None].float().to(device),
+                    P2[None].float().to(device),
+                    img1_shape=img1_size,
+                    img2_shape=img2_size,
+                    px_thrs=self.px_thrs,
+                )
+
+                for b in rep:
+                    for k in rep[b]:
+                        rep_results[k].append(rep[b][k])
+
+            # average over all pairs
+            for k in rep_results:
+                rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
+
+        return matches_dict, rep_results
 
     def batch_pose_estimation(self, matches_dict):
         """Perform pose estimation in parallel batches."""
-        print("\nStarting parallel pose estimation...")
+        logger.info("Starting parallel pose estimation...")
 
         # Prepare data for parallel processing
         batch_data = []
@@ -304,7 +364,7 @@ class Benchmark:
         # Force loky backend for better isolation and reproducibility
         with parallel_backend("loky", n_jobs=self.njobs):
             # Phase 1: Batch matching (with feature extraction if needed)
-            matches_dict = self.batch_match_all_pairs(
+            matches_dict, rep_results = self.batch_match_all_pairs(
                 wrapper, device, save_key=features_save_key
             )
 
@@ -322,7 +382,7 @@ class Benchmark:
         acc_15 = (tot_e_pose < 15).mean()
         acc_20 = (tot_e_pose < 20).mean()
 
-        return {
+        out = {
             "inlier": round(np.mean(inliers)),
             "auc_5": round(auc[0] * 100, 1),
             "auc_10": round(auc[1] * 100, 1),
@@ -330,7 +390,14 @@ class Benchmark:
             "map_5": round(acc_5 * 100, 1),
             "map_10": round(np.mean([acc_5, acc_10]) * 100, 1),
             "map_20": round(np.mean([acc_5, acc_10, acc_15, acc_20]) * 100, 1),
-        }, timestamp
+        }
+
+        if self.compute_repeatability:
+            for k in rep_results:
+                rep_results[k] = round(rep_results[k] * 100, 1)
+            out.update(rep_results)
+
+        return out, timestamp
 
 
 if __name__ == "__main__":
@@ -339,12 +406,12 @@ if __name__ == "__main__":
     from wrappers_manager import wrappers_manager
 
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ds", type=str, default="megadepth1500", help="Dataset (ds) name"
+    )
     parser.add_argument("--device", default="cuda", help="Device to use for matching")
     parser.add_argument(
         "--wrapper-name", type=str, default="superpoint", help="Wrapper name"
-    )
-    parser.add_argument(
-        "--dataset-name", type=str, default="megadepth1500", help="Dataset name"
     )
     parser.add_argument(
         "--data-path",
@@ -364,7 +431,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ransac-th", type=float, default=1.0, help="Pose estimation threshold"
     )
-    parser.add_argument("--max-kpts", type=int, default=2048, help="Maximum keypoints")
+    parser.add_argument(
+        "--max-kpts",
+        type=int,
+        choices=[2048, 8000],
+        default=2048,
+        help="Maximum keypoints (allowed values: 2048 or 8000)",
+    )
     parser.add_argument("--run-tag", type=str, default=None, help="Tag for this run")
     parser.add_argument(
         "--custom-desc", type=str, default=None, help="Path to custom descriptors"
@@ -396,11 +469,14 @@ if __name__ == "__main__":
         default=None,
         help="Path to precomputed descriptors (optional)",
     )
+    parser.add_argument(
+        "--compute-repeatability", action="store_true", help="Compute repeatability"
+    )
     args = parser.parse_args()
 
     device = args.device
     wrapper_name = args.wrapper_name
-    dataset_name = args.dataset_name
+    dataset_name = args.ds
 
     if dataset_name.lower() in ["md", "md1500", "megadepth1500"]:
         dataset_name = "megadepth1500"
@@ -429,6 +505,7 @@ if __name__ == "__main__":
     ghr_partial = args.ghr_partial
     keypoints_path = args.keypoints_path
     descriptors_path = args.descriptors_path
+    compute_repeatability = args.compute_repeatability
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
@@ -461,7 +538,7 @@ if __name__ == "__main__":
 
         wrapper.add_custom_descriptor(network)
         wrapper.name = f"{wrapper.name}+SANDesc"
-        print(f"Using custom descriptors from {custom_desc}.")
+        logger.info(f"Using custom descriptors from {custom_desc}.")
 
     # matcher params
     key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn {max_kpts}"
@@ -470,7 +547,7 @@ if __name__ == "__main__":
     if args.run_tag is not None:
         key = f"{key} {args.run_tag}"
 
-    print(f"\n>>> Running parallel benchmark for {key}...<<<\n")
+    logger.info(f"\n>>> Running parallel benchmark for {key}...<<<\n")
 
     # create if not exists
     results_path = Path(f"benchmarks/{dataset_name}/results")
@@ -503,6 +580,7 @@ if __name__ == "__main__":
         ghr_partial=ghr_partial,
         keypoints_path=keypoints_path,
         descriptors_path=descriptors_path,
+        compute_repeatability=compute_repeatability,
     )
 
     # Run the benchmark
@@ -512,7 +590,7 @@ if __name__ == "__main__":
     results, timestamp = benchmark.benchmark(
         wrapper, args.device, save_key=feature_save_key
     )
-    print(f"Total time: {time.time()-s:.1f} seconds")
+    logger.info(f"Total time: {time.time()-s:.1f} seconds")
     print_metrics(wrapper, results)
     print("-------------------------------------------------------------")
 
@@ -521,4 +599,4 @@ if __name__ == "__main__":
     with open(results_path / "results.json", "w") as f:
         json.dump(data, f)
 
-    print(f"Results saved to {results_path/'results.json'}\n\n")
+    logger.info(f"Results saved to {results_path/'results.json'}\n\n")
