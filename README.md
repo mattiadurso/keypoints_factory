@@ -230,7 +230,6 @@ That’s it—you’re ready to benchmark.
 
 #### Benchmarks
 * [ ] add depth maps to GHR
-* [ ] add view.txt to GHR
 * [ ] Aachen Day/Night
     - add benchmark
 * [ ] add support for matchers (LoFTR, RoMA, etc)
