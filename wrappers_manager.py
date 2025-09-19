@@ -20,10 +20,13 @@ def get_wrappers_list():
 def wrappers_manager(name, device="cpu"):
     print(f"Creating wrapper for {name} on device {device}.\n")
 
-    if name == "disk":
-        from wrappers.disk_wrapper import DiskWrapper
+    if name == "disk" or name == "disk-kornia":
+        from wrappers.disk_wrapper import DiskWrapper, DiskWrapperKornia
 
-        wrapper = DiskWrapper(device=device)
+        if name == "disk":
+            wrapper = DiskWrapper(device=device)
+        else:
+            wrapper = DiskWrapperKornia(device=device)  # use kornia version
         wrapper.name = name
 
     elif name == "superpoint":
