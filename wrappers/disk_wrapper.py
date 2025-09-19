@@ -1,11 +1,11 @@
 import sys
 import torch
-import torch.nn.functional as F
+import kornia.feature as KF
+
+from wrappers.wrapper import MethodWrapper, MethodOutput
 
 sys.path.append("methods/disk")
-
 from methods.disk.disk import DISK
-from wrappers.wrapper import MethodWrapper, MethodOutput
 
 
 class DiskWrapper(MethodWrapper):
@@ -52,3 +52,30 @@ class DiskWrapper(MethodWrapper):
                 des = self.grid_sample_nan(kpts[None], des_vol, mode="nearest")[0][0].T
 
         return MethodOutput(kpts=kpts, kpts_scores=kpts_scores, des=des)
+
+
+import kornia as K
+import torch.nn.functional as F
+
+
+class DiskWrapperKornia(MethodWrapper):
+    def __init__(self, device: str = "cuda:0", border=16) -> None:
+        super().__init__(name="disk", border=border, device=device)
+
+        self.disk = KF.DISK.from_pretrained("depth").to(device)
+
+    @torch.inference_mode()
+    def _extract(
+        self, img: torch.Tensor, max_kpts: int, custom_kpts=None
+    ) -> MethodOutput:
+        with torch.amp.autocast(
+            device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp
+        ):
+            out = self.disk(img[None], max_kpts)[0]
+            kpts, des = out.keypoints, out.descriptors
+
+            if self.custom_descriptor is not None:
+                des_vol = self.custom_descriptor(img[None])
+                des = self.grid_sample_nan(kpts[None], des_vol, mode="nearest")[0][0].T
+
+        return MethodOutput(kpts=kpts, des=des)
