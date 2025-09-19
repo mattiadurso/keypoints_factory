@@ -121,14 +121,12 @@ class Benchmark:
         else:
             self.keypoints_dict = None
             self.descriptors_dict = None
-            logger.info("Will extract features using wrapper")
+            logger.info("Extracting features using wrapper")
 
         self.compute_repeatability = compute_repeatability
 
     def extract_features_with_wrapper(self, wrapper):
         """Extract features using the wrapper."""
-        logger.info("Extracting features using wrapper...")
-
         keypoints_dict = {}
         descriptors_dict = {}
 
@@ -142,11 +140,12 @@ class Benchmark:
             unique_images.add(img2)
 
         # Extract features for each image
-        for img_path in tqdm(unique_images, desc="Extracting features"):
-            im_path = self.images_path / img_path
+        s = " and depths" if self.compute_repeatability else ""
+        for img_path in tqdm(unique_images, desc=f"Extracting features{s}"):
+            img_path = self.images_path / img_path
 
             try:
-                img = Image.open(im_path)
+                img = Image.open(img_path)
 
                 if self.scaling_factor != 1:
                     W, H = img.size
@@ -159,7 +158,7 @@ class Benchmark:
                 with torch.no_grad():
                     out = wrapper.extract(img, self.max_kpts)
 
-                keypoints_dict[img_path] = out.kpts.cpu()
+                keypoints_dict[img_path] = {"kpts": out.kpts.cpu()}
                 descriptors_dict[img_path] = out.des.cpu()
 
             except Exception as e:
@@ -218,8 +217,8 @@ class Benchmark:
 
         for (img1, img2), K1, K2, R, t in tqdm(pair_data, desc="Matching pairs"):
             # Get features
-            kpts1 = keypoints_dict[img1]
-            kpts2 = keypoints_dict[img2]
+            kpts1 = keypoints_dict[img1]["kpts"]
+            kpts2 = keypoints_dict[img2]["kpts"]
             desc1 = descriptors_dict[img1].to(device)
             desc2 = descriptors_dict[img2].to(device)
 
@@ -253,7 +252,7 @@ class Benchmark:
             }
             for pair in tqdm(pair_data, desc="Repeatability"):
                 img1, img2 = pair[:1][0]
-                kpts1 = keypoints_dict[img1]
+                kpts1 = keypoints_dict[img1]["kpts"]
                 K1 = self.views_dict[img1]["K"]
                 P1 = self.views_dict[img1]["P"]
                 img1_size = self.views_dict[img1]["image_size"]
@@ -263,7 +262,7 @@ class Benchmark:
                 ).float()
                 img1_size = self.views_dict[img1]["image_size"]
 
-                kpts2 = keypoints_dict[img2]
+                kpts2 = keypoints_dict[img2]["kpts"]
                 K2 = self.views_dict[img2]["K"]
                 P2 = self.views_dict[img2]["P"]
                 img2_size = self.views_dict[img2]["image_size"]
