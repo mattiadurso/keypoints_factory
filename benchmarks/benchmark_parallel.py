@@ -14,7 +14,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import h5py
+import gc
 import time
 import torch
 import logging
@@ -35,7 +35,10 @@ from benchmarks.benchmark_utils import (
     pose_auc,
     process_pose_estimation_batch,
     parse_poses,
+    load_depth,
 )
+from benchmarks.repeatability_utils import compute_repeatabilities_from_kpts
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -72,13 +75,16 @@ class Benchmark:
         self.ghr_partial = ghr_partial
         self.keypoints_path = keypoints_path
         self.descriptors_path = descriptors_path
-        self.compute_repeatability = compute_repeatability
+        self.compute_repeatability = compute_repeatability and benchmark_name in [
+            "megadepth1500",
+            "graz_high_res",
+        ]  # repeatability only for MegaDepth and GHR
         self.px_thrs = px_thrs
 
         s = " with repeatability computation" if self.compute_repeatability else ""
-        logger.info(f"Benchmark {self.benchmark_name}{s}.")
+        logger.info(f"Benchmarking {self.benchmark_name}{s}.")
 
-        # Load pairs
+        # Load pairs and paths
         self.dataset_path = abs_root / self.dataset_path
         with open(self.dataset_path / "pairs_calibrated.txt", "r") as f:
             self.pairs_calibrated = f.read().splitlines()  # limit for quick testing
@@ -96,8 +102,10 @@ class Benchmark:
 
         elif dataset_name.lower() == "scannet1500":
             self.images_path = self.dataset_path
+
         elif dataset_name.lower() == "graz_high_res":
             self.images_path = self.dataset_path
+
         else:
             raise ValueError(f"Unknown dataset name: {dataset_name}")
 
@@ -123,8 +131,6 @@ class Benchmark:
             self.descriptors_dict = None
             logger.info("Extracting features using wrapper")
 
-        self.compute_repeatability = compute_repeatability
-
     def extract_features_with_wrapper(self, wrapper):
         """Extract features using the wrapper."""
         keypoints_dict = {}
@@ -141,8 +147,8 @@ class Benchmark:
 
         # Extract features for each image
         s = " and depths" if self.compute_repeatability else ""
-        for img_path in tqdm(unique_images, desc=f"Extracting features{s}"):
-            img_path = self.images_path / img_path
+        for img_name in tqdm(unique_images, desc=f"Extracting features{s}"):
+            img_path = self.images_path / img_name
 
             try:
                 img = Image.open(img_path)
@@ -158,12 +164,30 @@ class Benchmark:
                 with torch.no_grad():
                     out = wrapper.extract(img, self.max_kpts)
 
-                keypoints_dict[img_path] = {"kpts": out.kpts.cpu()}
-                descriptors_dict[img_path] = out.des.cpu()
+                keypoints_dict[img_name] = {"kpts": out.kpts.cpu()}
+                descriptors_dict[img_name] = out.des.cpu()
+
+                if self.compute_repeatability:
+                    # load depth
+                    Z_path = self.depths_path / f"{img_name.split('.')[0]}.h5"
+                    Z = load_depth(
+                        Z_path,
+                        scale_factor=self.scaling_factor,
+                        device=out.kpts.device,
+                    )
+                    Z_sampled, _ = wrapper.grid_sample_nan(
+                        out.kpts[None], Z[None], mode="nearest"
+                    )
+                    keypoints_dict[img_name]["depth"] = Z_sampled[0]
 
             except Exception as e:
-                logger.info(f"Error processing {img_path}: {e}")
+                logger.info(f"Error processing {img_name}: {e}")
                 continue
+
+        # free memory, this stuff is no longer needed
+        del wrapper, img, out, Z, Z_sampled
+        gc.collect()
+        torch.cuda.empty_cache()
 
         return keypoints_dict, descriptors_dict
 
@@ -241,35 +265,32 @@ class Benchmark:
                 "t": t,
             }
 
-        # First naive implementation of repeatability computation
-        # next: sample depth in keypoints and batch
-        if self.compute_repeatability:
-            from rep_utils import compute_repeatabilities_from_kpts
+            # free memory, this stuff is no longer needed
+            del desc1, desc2, matches
+            torch.cuda.empty_cache()
 
+        # Compute repeatability
+        if self.compute_repeatability:
             rep_results = {
                 **{f"rep_{int(pix)}": [] for pix in self.px_thrs},
                 **{f"rep_mnn_{int(pix)}": [] for pix in self.px_thrs},
             }
-            for pair in tqdm(pair_data, desc="Repeatability"):
+
+            for pair in tqdm(
+                pair_data, desc="Repeatability"
+            ):  # runs in ~5s with 2048kpts, batching it might be even faster
                 img1, img2 = pair[:1][0]
+
                 kpts1 = keypoints_dict[img1]["kpts"]
+                Z1 = keypoints_dict[img1]["depth"]
                 K1 = self.views_dict[img1]["K"]
                 P1 = self.views_dict[img1]["P"]
                 img1_size = self.views_dict[img1]["image_size"]
-                Z1_path = self.depths_path / f"{img1.split('.')[0]}.h5"
-                Z1 = torch.tensor(
-                    h5py.File(Z1_path, "r")["depth"][()], device=device
-                ).float()
-                img1_size = self.views_dict[img1]["image_size"]
 
                 kpts2 = keypoints_dict[img2]["kpts"]
+                Z2 = keypoints_dict[img2]["depth"]
                 K2 = self.views_dict[img2]["K"]
                 P2 = self.views_dict[img2]["P"]
-                img2_size = self.views_dict[img2]["image_size"]
-                Z2_path = self.depths_path / f"{img2.split('.')[0]}.h5"
-                Z2 = torch.tensor(
-                    h5py.File(Z2_path, "r")["depth"][()], device=device
-                ).float()
                 img2_size = self.views_dict[img2]["image_size"]
 
                 rep = compute_repeatabilities_from_kpts(
@@ -289,7 +310,6 @@ class Benchmark:
                 for b in rep:
                     for k in rep[b]:
                         rep_results[k].append(rep[b][k])
-
             # average over all pairs
             for k in rep_results:
                 rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
@@ -365,7 +385,7 @@ class Benchmark:
             # Phase 1: Batch matching (with feature extraction if needed)
             matches_dict, rep_results = self.batch_match_all_pairs(
                 wrapper, device, save_key=features_save_key
-            )
+            )  # for some reason it uses GPU memory (it shouldn't), but freeing wrapper works
 
             # Phase 2: Parallel pose estimation
             results = self.batch_pose_estimation(matches_dict)
@@ -382,19 +402,21 @@ class Benchmark:
         acc_20 = (tot_e_pose < 20).mean()
 
         out = {
-            "inlier": round(np.mean(inliers)),
-            "auc_5": round(auc[0] * 100, 1),
-            "auc_10": round(auc[1] * 100, 1),
-            "auc_20": round(auc[2] * 100, 1),
-            "map_5": round(acc_5 * 100, 1),
-            "map_10": round(np.mean([acc_5, acc_10]) * 100, 1),
-            "map_20": round(np.mean([acc_5, acc_10, acc_15, acc_20]) * 100, 1),
+            "inlier": np.mean(inliers),
+            "auc_5": auc[0],
+            "auc_10": auc[1],
+            "auc_20": auc[2],
+            "map_5": acc_5,
+            "map_10": np.mean([acc_5, acc_10]),
+            "map_20": np.mean([acc_5, acc_10, acc_15, acc_20]),
         }
 
         if self.compute_repeatability:
-            for k in rep_results:
-                rep_results[k] = round(rep_results[k] * 100, 1)
             out.update(rep_results)
+
+        # Final rounding
+        for k in out:
+            out[k] = round(out[k], 1) if k == "inlier" else round(out[k] * 100, 1)
 
         return out, timestamp
 
@@ -419,7 +441,7 @@ if __name__ == "__main__":
         help="Path to dataset",
     )
     parser.add_argument(
-        "--njobs", type=int, default=8, help="Number of parallel jobs"
+        "--njobs", type=int, default=16, help="Number of parallel jobs"
     )  # might slightly affect reproducibility and results
     parser.add_argument(
         "--ratio-test", type=float, default=1.0, help="Ratio test threshold"
@@ -451,7 +473,7 @@ if __name__ == "__main__":
         "--scaling-factor",
         type=float,
         default=1.0,
-        help="Scaling factor for input images (e.g., 2 for half size)",
+        help="Down-scaling factor for input images (e.g., 2 for half size)",
     )
     parser.add_argument(
         "--ghr-partial",
@@ -469,7 +491,7 @@ if __name__ == "__main__":
         help="Path to precomputed descriptors (optional)",
     )
     parser.add_argument(
-        "--compute-repeatability", action="store_true", help="Compute repeatability"
+        "--skip-repeatability", action="store_false", help="Don't compute repeatability"
     )
     args = parser.parse_args()
 
@@ -504,7 +526,7 @@ if __name__ == "__main__":
     ghr_partial = args.ghr_partial
     keypoints_path = args.keypoints_path
     descriptors_path = args.descriptors_path
-    compute_repeatability = args.compute_repeatability
+    compute_repeatability = args.skip_repeatability
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
@@ -523,14 +545,9 @@ if __name__ == "__main__":
             "third_block": config["third_block"],
         }
 
-        from sandesc_models.sandesc.network_descriptor import SANDesc, SANDescD
+        from sandesc_models.sandesc.network_descriptor import SANDesc
 
-        # network = SANDesc(**model).eval().to(device)
-        network = SANDescD(**model).eval().to(device)
-
-        from torchinfo import summary
-
-        summary(network)
+        network = SANDesc(**model).eval().to(device)
 
         weights = torch.load(custom_desc, weights_only=False)
         network.load_state_dict(weights["state_dict"])
@@ -589,7 +606,6 @@ if __name__ == "__main__":
     results, timestamp = benchmark.benchmark(
         wrapper, args.device, save_key=feature_save_key
     )
-    logger.info(f"Total time: {time.time()-s:.1f} seconds")
     print_metrics(wrapper, results)
     print("-------------------------------------------------------------")
 
@@ -598,4 +614,6 @@ if __name__ == "__main__":
     with open(results_path / "results.json", "w") as f:
         json.dump(data, f)
 
-    logger.info(f"Results saved to {results_path/'results.json'}\n\n")
+    logger.info(
+        f"Results computed in {time.time()-s:.1f}s and saved to {results_path/'results.json'}\n\n"
+    )
