@@ -1,7 +1,6 @@
 import os
 
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-
 import sys
 from pathlib import Path
 
@@ -37,6 +36,7 @@ class IMC21MNNBenchmark:
         overwrite_extraction: bool = False,
         njobs: int = 16,
         scene_set: str = "test",
+        # multiview: bool = False,
     ) -> None:
         """
         Args:
@@ -45,6 +45,12 @@ class IMC21MNNBenchmark:
             min_score: minimum score for the matches
             ratio_test: ratio test for the matches
             max_kpts: maximum number of keypoints to be extracted
+            overwrite_extraction: whether to overwrite the existing features
+            njobs: number of parallel jobs for feature matching
+            scene_set: which set to use, either 'test' or 'val'
+            # multiview: whether to use multiview matching
+        Returns:
+            None
         """
         self.device = device
         self.data_path = data_path
@@ -55,6 +61,7 @@ class IMC21MNNBenchmark:
         self.overwrite_extraction = overwrite_extraction
         self.njobs = njobs
         self.scene_set = scene_set
+        # self.multiview = multiview
 
         # Matcher
         self.matcher = MNN(
@@ -129,7 +136,11 @@ class IMC21MNNBenchmark:
         logger.info("Data imported to the IMC benchmark.")
 
         method_name_json = run_benchmark(
-            method_name, self.matcher.name, scenes_set=self.scene_set
+            method_name,
+            self.matcher.name,
+            scenes_set=self.scene_set,
+            num_kpts=self.max_kpts,
+            # multiview=self.multiview,
         )
 
         # Step 4: Copy results to the results folder
@@ -166,6 +177,9 @@ if __name__ == "__main__":
     parser.add_argument("--custom-desc", type=str, default=None)
     parser.add_argument("--njobs", type=int, default=18)
     parser.add_argument("--scene-set", type=str, default="test")
+    # parser.add_argument(
+    #     "--multiview", action="store_true", help="Enable multiview matching"
+    # )
     parser.add_argument(
         "--overwrite-extraction",
         action="store_true",
@@ -181,6 +195,7 @@ if __name__ == "__main__":
     th = args.th
     custom_desc = args.custom_desc
     njobs = args.njobs
+    # multiview = args.multiview
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
@@ -228,6 +243,7 @@ if __name__ == "__main__":
         device=device,
         njobs=njobs,
         scene_set=args.scene_set,
+        # multiview=multiview,
     )
 
     # Run the benchmark

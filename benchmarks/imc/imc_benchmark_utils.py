@@ -285,7 +285,7 @@ def import_data_to_benchmark(
         )
 
 
-def generate_json(method_name: str, matcher_name: str = None):
+def generate_json(method_name: str, matcher_name: str = None, num_kpts: int = 2048):
     method_name_converted = method_name.replace("_", "-").lower()
 
     if matcher_name is not None:
@@ -297,7 +297,7 @@ def generate_json(method_name: str, matcher_name: str = None):
                 "json_label": method_name_json,
                 "keypoint": method_name_json,
                 "descriptor": method_name_json,
-                "num_keypoints": 2048,
+                "num_keypoints": num_kpts,
             },
             "config_phototourism_stereo": {
                 "use_custom_matches": True,
@@ -346,9 +346,15 @@ def generate_json(method_name: str, matcher_name: str = None):
 
 
 def run_benchmark(
-    method_name: str, matcher_name: str, scenes_set: str, multiview: bool = False
+    method_name: str,
+    matcher_name: str,
+    scenes_set: str,
+    num_kpts: int = 2048,
+    multiview: bool = False,
 ) -> str:
-    json_path, method_name_json = generate_json(method_name, matcher_name)
+    json_path, method_name_json = generate_json(
+        method_name, matcher_name, num_kpts=num_kpts
+    )
     subprocess.call(
         [
             sys.executable,
