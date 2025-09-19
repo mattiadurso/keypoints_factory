@@ -1,9 +1,12 @@
 import cv2
+import h5py
 import torch
 import random
 import logging
 import argparse
 import numpy as np
+from PIL import Image
+import torch.nn.functional as F
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +22,24 @@ def parse_poses(poses_file, benchmark_name):
         raise NotImplementedError("Parsing for scannet1500 not implemented yet.")
     else:
         raise ValueError(f"Unknown benchmark name: {benchmark_name}")
+
+
+def load_depth(depth_path, scale_factor, device):
+    """Load depth data from a given file."""
+    depth = torch.tensor(h5py.File(depth_path, "r")["depth"][()], device=device).float()
+    # crop multiple of 16 for compatibility with disk
+    H, W = depth.shape
+    depth = depth[: (H // 16) * 16, : (W // 16) * 16]  # same as image in img_from_numpy
+
+    if scale_factor != 1.0:  # mostly for GHR, with md is must be 1.0
+        depth = F.interpolate(
+            depth[None, None],
+            scale_factor=scale_factor,
+            mode="bilinear",
+            align_corners=False,
+        )[0, 0]
+
+    return depth
 
 
 def parse_md1500_poses(poses_file):
@@ -100,7 +121,6 @@ def process_pose_estimation_batch(pair_matches_data, th, worker_seed=None):
 
         except Exception as e:
             results.append((img1, img2, 180, 180, 180, 0))
-            # results.append((scene_name, pair_id, img1, img2, 180, 180, 180, 0))
 
             logging.debug(f"Error processing pair ({img1}, {img2}): {e}")
 
