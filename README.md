@@ -1,6 +1,6 @@
 # Keypoint Factory
 
-A lightweight factory of local wrappers for feature detection and description. It downloads third-party implementations and exposes a unified interface so it is possible to test and compare methods quickly. Exact results might slightly change according to different libraries version, hardware or unkown factor apparently.
+A lightweight factory of local wrappers for feature detection and description. It downloads third-party implementations and exposes a unified interface so it is possible to test and compare methods quickly. Exact results might slightly change according to different libraries version, hardware or unkown factors apparently.
 
 Code to download the benchmarks' data is provided in `bash` folder.
 
@@ -69,12 +69,15 @@ After downloading the target methods, verifying that the wrapper exists and runs
 The **Graz High-Resolution Benchmark (HRB)** is a dataset for evaluating feature extractors and reconstruction models under high-resolution conditions, where compute and memory limits are most stressed. It contains six urban scenes recorded in 4K at 30 fps (sampled at 1 fps) using pre-calibrated cameras. Sparse reconstructions built with COLMAP achieved a mean reprojection error of \~0.97 px across 1.3M 3D points. After pruning view graphs and filtering pairs, the final benchmark includes 1,866 images and 4,413 image pairs. HRB is run at three resolutions, namely 4K (3840×2160), QHD (2560×1440), and FHD (1920×1080). Results are computed following the MegaDepth-1500 protocol.
 
 The benchmark computes the following metrics.
-- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
-  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°, 20°).  
-  A pose is correct if both translation and rotation errors are below the threshold.
+- **Repeatabilty**  
+  Repeatability is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels.
 
 - **Number of Inliers**  
   The raw count of inlier correspondences found during pose estimation.
+
+- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
+  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°, 20°).  
+  A pose is correct if both translation and rotation errors are below the threshold.
 
 Use the following command to run it.
 ```bash
@@ -162,14 +165,14 @@ Despite this benchmark is heavily parallelized, it takes ~1h per method. Neverth
 
 Between the metrics compute by the benchmark, usually oen find in lietarture the following.
 - **Repeatabilty**  
-  Ratio of repeated keypoints between an image pair after applying the known homography, relative to the smaller number of keypoints detected in the two images. Usually with a threshold of 3 pixels.
-
-- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
-  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°).  
-  A pose is correct if both translation and rotation errors are below the threshold.
+  Repeatability is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels. 
 
 - **Number of Inliers**  
   The raw count of inlier correspondences found during pose estimation.
+  
+- **Area Under the Curve of the Relative Pose Estimation (AUC)**  
+  Area under the curve of the percentage of correctly estimated camera poses as a function of angular error thresholds (5°, 10°).  
+  A pose is correct if both translation and rotation errors are below the threshold.
 
 Use the following command to run it.
 ```bash
@@ -230,11 +233,10 @@ That’s it—you’re ready to benchmark.
 
 #### Benchmarks
 * [ ] add depth maps to GHR
-* [ ] Aachen Day/Night
-    - add benchmark
-* [ ] add support for matchers (LoFTR, RoMA, etc)
 * [ ] IMC
     - add multiview support, now only stereo
+* [ ] add support for matchers (LoFTR, RoMA, etc)
+
 
 
 ## License and Attribution
