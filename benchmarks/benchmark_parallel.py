@@ -21,7 +21,6 @@ import logging
 import argparse
 import numpy as np
 
-from PIL import Image
 from tqdm.auto import tqdm
 from datetime import datetime
 from functools import partial
@@ -164,15 +163,16 @@ class Benchmark:
             img_path = self.images_path / img_name
 
             try:
-                img = Image.open(img_path)
+                # img = Image.open(img_path)
 
-                if self.scaling_factor != 1:
-                    W, H = img.size
-                    img = img.resize(
-                        (int(W // self.scaling_factor), int(H // self.scaling_factor))
-                    )
+                # if self.scaling_factor != 1:
+                #     W, H = img.size
+                #     img = img.resize(
+                #         (int(W // self.scaling_factor), int(H // self.scaling_factor))
+                #     )
 
-                img = wrapper.img_from_numpy(np.array(img))
+                # img = wrapper.img_from_numpy(np.array(img))
+                img = wrapper.load_image(img_path, scaling=self.scaling_factor)
 
                 with torch.no_grad():
                     out = wrapper.extract(img, self.max_kpts)
