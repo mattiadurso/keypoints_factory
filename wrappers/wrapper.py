@@ -5,11 +5,11 @@ from typing import Union, Tuple, List, Any, Optional
 
 import h5py
 import torch
+from PIL import Image
 from torch import Tensor
 from torchvision import transforms
 from torch.nn import functional as F
 import numpy as np
-import imageio.v3 as io
 from abc import ABC, abstractmethod
 
 
@@ -78,7 +78,7 @@ class MethodWrapper(ABC):
         self.amp_dtype = torch.float16
 
     def load_image(self, path):
-        img = io.imread(path)
+        img = np.array(Image.open(path))
         return self.img_from_numpy(img)
 
     def img_from_numpy(self, img: np.ndarray) -> Union[Tensor, np.ndarray]:
