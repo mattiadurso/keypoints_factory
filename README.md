@@ -15,10 +15,35 @@ conda activate keypoint_factory  # or . ./activate_env.sh if you are lazy
 ```
 Otherwise, the following packages can be manually installed:
 ```bash
-pip install opencv-python h5py torch torchvision Pillow numpy matplotlib kornia pyyaml joblib tqdm pandas pydegensac
+# Install PyTorch with CUDA 12.4 support
+pip install torch==2.6.0+cu124 torchvision==0.21.0+cu124 --index-url https://download.pytorch.org/whl/cu124
 
-# and optionally
-pip install nvidia-ml-py xformers
+pip install \
+  opencv-python==4.11.0.86 \
+  h5py==3.13.0 \
+  Pillow==11.1.0 \
+  numpy==1.26.4 \
+  matplotlib==3.10.1 \
+  kornia==0.8.0 \
+  pyyaml==6.0.2 \
+  joblib==1.4.2 \
+  tqdm==4.67.1 \
+  pandas==2.2.3 \
+  pydegensac==0.1.2
+
+# and optionally 
+# nvidia-ml-py: to measure VARM usage
+# xformers: to increse speed when using transformer-based models models
+pip install \
+  nvidia-ml-py==13.580.82 \
+  xformers==0.0.29.post2
+
+# to run imc, those are also needed
+pip install \
+  schema \
+  scipy \
+  shortuuid \
+  jsmin
 ```
 Other dependencies might be related to different methods (e.g., ALIKED). Downloading them with scripts in this repo should install their dependencies automatically.
 
@@ -114,7 +139,7 @@ Here below we report the results benchmarks. We include also results with SANDes
 ------
 
 ### MegaDepth-1500
-[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We assigning a score of 180 degrees (the worst score) when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, we suggest to evaluated methods at keypoint budgets of 2K and 30K.
+[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500)  is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We assigning a score of 180 degrees (the worst score) when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, we suggest to evaluated methods at keypoint budgets of 2K and 30K. On a RTX 4090 and using 16 cores, SuperPoint completes the benckmark in less than a minute.
 
 The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
 
@@ -189,6 +214,28 @@ python benchmarks/imc/run_imc.py             # for battery tests
 ```
 --- 
 
+### Speed and Memory
+The **Speed and Memory** Benchmark evaluates the computational efficiency of feature extraction methods in terms of runtime and memory usage. This benchmark is designed to measure the practical feasibility of using different methods in real-world applications, where resource constraints such as processing time and memory availability are critical.
+
+Metrics Computed:
+- **Runtime**
+  The average time taken to process a single image or image pair, measured in milliseconds (ms).
+
+- **Memory Usage** 
+  The peak memory consumption during feature extraction, measured in megabytes (MB).
+
+Benchmark Details:
+The benchmark runs each method on a predefined set of images or image pairs.
+It uses a consistent environment to ensure fair comparisons across methods.
+
+Use the following command to run it.
+```bash
+python benchmarks/speed_and_memory/speed.py
+```
+
+
+
+
 ### Why this repo?
 
 I couldn’t find a single, unified, and reproducible way to **benchmark feature extractors** quickly. Setting up fair benchmarks shouldn’t steal time from research—so this repo aims to make it fast and consistent.
@@ -230,6 +277,8 @@ That’s it, you’re ready to benchmark.
 * [ ] IMC
     - add multiview support, now only stereo
 * [ ] add support for matchers (LoFTR, RoMA, etc)
+* [ ] maybe unify printing functions names
+
 
 
 ## License and Attribution
