@@ -75,10 +75,20 @@ class Benchmark:
         self.ghr_partial = ghr_partial
         self.keypoints_path = keypoints_path
         self.descriptors_path = descriptors_path
-        self.compute_repeatability = compute_repeatability and benchmark_name in [
-            "megadepth1500",
-            "graz_high_res",
-        ]  # repeatability only for MegaDepth and GHR
+        if scaling_factor != 1 and compute_repeatability:
+            logger.warning(
+                "Repeatability computation might be incorrect when \
+                scaling_factor != 1. Thus, it is disabled."
+            )
+        self.compute_repeatability = (
+            compute_repeatability
+            and benchmark_name
+            in [
+                "megadepth1500",
+                "graz_high_res",
+            ]
+            and scaling_factor == 1
+        )  # repeatability only for MegaDepth and GHR
         self.px_thrs = px_thrs
 
         s = " with repeatability computation" if self.compute_repeatability else ""
@@ -97,14 +107,17 @@ class Benchmark:
         if dataset_name.lower() == "megadepth1500":
             self.images_path = self.dataset_path / "images"
             self.depths_path = self.dataset_path / "depths"
-            self.poses_path = self.dataset_path / "views.txt"
-            self.views_dict = parse_poses(self.poses_path, self.benchmark_name)
+            self.views_path = self.dataset_path / "views.txt"
+            self.views_dict = parse_poses(self.views_path, self.benchmark_name)
 
         elif dataset_name.lower() == "scannet1500":
             self.images_path = self.dataset_path
 
         elif dataset_name.lower() == "graz_high_res":
             self.images_path = self.dataset_path
+            self.depths_path = self.dataset_path
+            self.views_path = self.dataset_path / "views.txt"
+            self.views_dict = parse_poses(self.views_path, self.benchmark_name)
 
         else:
             raise ValueError(f"Unknown dataset name: {dataset_name}")
@@ -169,12 +182,24 @@ class Benchmark:
 
                 if self.compute_repeatability:
                     # load depth
-                    Z_path = self.depths_path / f"{img_name.split('.')[0]}.h5"
+                    if self.benchmark_name == "megadepth1500":
+                        Z_path = self.depths_path / f"{img_name.split('.')[0]}.h5"
+                    elif self.benchmark_name == "graz_high_res":
+                        scene, _, cam, image_name = img_name.split("/")
+                        Z_path = (
+                            self.depths_path
+                            / scene
+                            / "depth"
+                            / cam
+                            / f"{image_name.split('.')[0]}.h5"
+                        )
+
                     Z = load_depth(
                         Z_path,
                         scale_factor=self.scaling_factor,
-                        device=out.kpts.device,
+                        target=out.kpts,
                     )
+
                     Z_sampled, _ = wrapper.grid_sample_nan(
                         out.kpts[None], Z[None], mode="nearest"
                     )
@@ -432,7 +457,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--device", default="cuda", help="Device to use for matching")
     parser.add_argument(
-        "--wrapper-name", type=str, default="superpoint", help="Wrapper name"
+        "--wrapper-name", type=str, default="disk-kornia", help="Wrapper name"
     )
     parser.add_argument(
         "--data-path",
@@ -557,7 +582,11 @@ if __name__ == "__main__":
         logger.info(f"Using custom descriptors from {custom_desc}.")
 
     # matcher params
-    key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn {max_kpts}"
+
+    if dataset_name == "graz_high_res" and ghr_partial:
+        key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn_scale_{scaling_factor}_partial {max_kpts}"
+    else:
+        key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn_scale_{scaling_factor} {max_kpts}"
 
     # add tag to the key
     if args.run_tag is not None:
