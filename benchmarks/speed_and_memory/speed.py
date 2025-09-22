@@ -14,7 +14,11 @@ import glob
 import json
 import time
 import torch
-import pynvml
+
+try:
+    import pynvml
+except ImportError:
+    pynvml = None
 import logging
 import numpy as np
 from PIL import Image
@@ -26,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_vram_usage(gpu_index=0):
+    if pynvml is None:
+        logger.warning(
+            "pynvml is not available, cannot get VRAM usage. You can install it with pip install nvidia-ml-py"
+        )
+        return 0
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
     mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)

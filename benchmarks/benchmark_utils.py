@@ -24,8 +24,9 @@ def parse_poses(poses_file, benchmark_name):
         raise ValueError(f"Unknown benchmark name: {benchmark_name}")
 
 
-def load_depth(depth_path, scale_factor, device):
+def load_depth(depth_path, scale_factor, target):
     """Load depth data from a given file."""
+    device, dtype = target.device, target.dtype
     depth = torch.tensor(h5py.File(depth_path, "r")["depth"][()], device=device).float()
     # crop multiple of 16 for compatibility with disk
     H, W = depth.shape
@@ -35,11 +36,11 @@ def load_depth(depth_path, scale_factor, device):
         depth = F.interpolate(
             depth[None, None],
             scale_factor=scale_factor,
-            mode="bilinear",
+            mode="nearest",
             align_corners=False,
         )[0, 0]
 
-    return depth
+    return depth.to(device=device, dtype=dtype)
 
 
 def parse_md1500_poses(poses_file):

@@ -1,5 +1,4 @@
 import torch
-import torch as th
 import numpy as np
 import torch.nn.functional as F
 from torch import Tensor
@@ -114,14 +113,14 @@ def find_distance_matrices_between_points_and_their_projections(
 
     # ? compute the distance between all the reprojected points
     # # ? low memory usage, slow but correct
-    # dist0 = th.cdist(xy0.to(th.float), xy1_proj,         compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
-    # dist1 = th.cdist(xy0_proj,         xy1.to(th.float), compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
+    # dist0 = torch.cdist(xy0.to(torch.float), xy1_proj,         compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
+    # dist1 = torch.cdist(xy0_proj,         xy1.to(torch.float), compute_mode='donot_use_mm_for_euclid_dist')  # n0,n1
     # ? high memory usage, fast and correct
     dist0 = (xy0[:, None, :] - xy1_proj[None, :, :]).norm(dim=2)  # n0,n1
     dist1 = (xy0_proj[:, None, :] - xy1[None, :, :]).norm(dim=2)  # n0,n1
     # # ? low memory usage, fast but non-deterministic
-    # dist0 = th.cdist(xy0.to(th.float), xy1_proj)  # n0,n1
-    # dist1 = th.cdist(xy0_proj,         xy1.to(th.float))  # n0,n1
+    # dist0 = torch.cdist(xy0.to(torch.float), xy1_proj)  # n0,n1
+    # dist1 = torch.cdist(xy0_proj,         xy1.to(torch.float))  # n0,n1
     dist0[dist0.isnan()] = float("+inf")
     dist1[dist1.isnan()] = float("+inf")
     return dist0, dist1
@@ -192,28 +191,28 @@ def find_mutual_nearest_neighbors_from_keypoints_and_their_projections(
         # ? find the closest point in the image between each xy0 and xy1_proj
         xy0_closest_dist, closest0 = dist0.min(1)
     else:
-        xy0_closest_dist, closest0 = th.zeros((0,), device=device), th.zeros(
-            (0,), dtype=th.long, device=device
+        xy0_closest_dist, closest0 = torch.zeros((0,), device=device), torch.zeros(
+            (0,), dtype=torch.long, device=device
         )  # n0
     if n0 > 0:
         # ? find the closest point in the image between each xy1 and xy0_proj
         xy1_closest_dist, closest1 = dist1.min(0)
     else:
-        xy1_closest_dist, closest1 = th.zeros((0,), device=device), th.zeros(
-            (0,), dtype=th.long, device=device
+        xy1_closest_dist, closest1 = torch.zeros((0,), device=device), torch.zeros(
+            (0,), dtype=torch.long, device=device
         )  # n1
 
-    xy0_closest_matrix = th.zeros(dist0.shape, dtype=th.bool, device=device)
-    xy1_closest_matrix = th.zeros(dist0.shape, dtype=th.bool, device=device)
+    xy0_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
+    xy1_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
     if n1 > 0:
-        xy0_closest_matrix[th.arange(len(xy0)), closest0] = True
+        xy0_closest_matrix[torch.arange(len(xy0)), closest0] = True
     if n0 > 0:
-        xy1_closest_matrix[closest1, th.arange(len(xy1))] = True
+        xy1_closest_matrix[closest1, torch.arange(len(xy1))] = True
     # ? fink the keypoints that are mutual nearest neighbors (using only x,y coordinates) in both images
     mnn_mask = xy0_closest_matrix & xy1_closest_matrix
     mnn_idx = mnn_mask.nonzero()
-    xy0_closest_dist_mnn = th.ones_like(xy0_closest_dist) * float("inf")
-    xy1_closest_dist_mnn = th.ones_like(xy1_closest_dist) * float("inf")
+    xy0_closest_dist_mnn = torch.ones_like(xy0_closest_dist) * float("inf")
+    xy1_closest_dist_mnn = torch.ones_like(xy1_closest_dist) * float("inf")
     xy0_closest_dist_mnn[mnn_idx[:, 0]] = xy0_closest_dist[mnn_idx[:, 0]]
     xy1_closest_dist_mnn[mnn_idx[:, 1]] = xy1_closest_dist[mnn_idx[:, 1]]
     return (
@@ -256,8 +255,8 @@ def compute_repeatabilities(
     if not isinstance(px_thrs, list):
         px_thrs = [px_thrs]
 
-    rep = th.zeros(len(px_thrs), device=device)
-    rep_mnn = th.zeros(len(px_thrs), device=device)
+    rep = torch.zeros(len(px_thrs), device=device)
+    rep_mnn = torch.zeros(len(px_thrs), device=device)
     for i, px_thr in enumerate(px_thrs):
         n_close0 = (
             (xy0_closest_dist <= px_thr).sum().item()
@@ -339,7 +338,7 @@ def grid_sample_nan(xy: Tensor, img: Tensor, mode="nearest") -> tuple[Tensor, Te
             img, xy_norm, align_corners=False, mode=mode, padding_mode="border"
         )  # BxCxN0xN1
     # ? points xy that are not nan and have nan img. The sum is just to squash the channel dimension
-    mask_img_nan = th.isnan(sampled.sum(1))  # BxN or BxN0xN1
+    mask_img_nan = torch.isnan(sampled.sum(1))  # BxN or BxN0xN1
     # ? set to nan the sampled values for points xy that were nan (grid_sample consider those as (-1, -1))
     xy_invalid = xy_norm.isnan().any(-1)  # BxN or BxN0xN1
     if xy.ndim == 3:
@@ -376,7 +375,7 @@ def normalize_pixel_coordinates(
 
 
 def to_homogeneous(xy: Tensor) -> Tensor:
-    return th.cat((xy, th.ones_like(xy[..., 0:1])), dim=-1)
+    return torch.cat((xy, torch.ones_like(xy[..., 0:1])), dim=-1)
 
 
 def from_homogeneous(points: Tensor, eps: float = 1e-8) -> Tensor:
@@ -384,8 +383,8 @@ def from_homogeneous(points: Tensor, eps: float = 1e-8) -> Tensor:
     # set the results of division by zero/near-zero to 1.0
     # follow the convention of opencv:
     # https://github.com/opencv/opencv/pull/14411/files
-    mask = th.abs(z_vec) > eps
-    scale = th.where(mask, 1.0 / (z_vec + eps), th.ones_like(z_vec))
+    mask = torch.abs(z_vec) > eps
+    scale = torch.where(mask, 1.0 / (z_vec + eps), torch.ones_like(z_vec))
     output = scale * points[..., :-1]
     return output
 
@@ -409,13 +408,16 @@ def unproject_to_virtual_plane(
         original_type = xy.dtype
         # Bx3x3 * Bx3xn = Bx3xn  -> B,n,3 after permute
         xyz = (
-            (th.inverse(K.to(th.double)) @ (xy_hom.permute(0, 2, 1).to(th.double)))
+            (
+                torch.inverse(K.to(torch.double))
+                @ (xy_hom.permute(0, 2, 1).to(torch.double))
+            )
             .permute(0, 2, 1)
             .to(original_type)
         )
     else:
         # Bx3x3 * Bx3xn = Bx3xn  -> B,n,3 after permute
-        xyz = (th.inverse(K) @ (xy_hom.permute(0, 2, 1))).permute(0, 2, 1)
+        xyz = (torch.inverse(K) @ (xy_hom.permute(0, 2, 1))).permute(0, 2, 1)
 
     return xyz
 
@@ -457,8 +459,8 @@ def invert_P(P: Tensor) -> Tensor:
     B = P.shape[0]
     R = P[:, 0:3, 0:3]
     t = P[:, 0:3, 3:4]
-    P_inv = th.cat((R.permute(0, 2, 1), -R.permute(0, 2, 1) @ t), dim=2)
-    P_inv = th.cat(
+    P_inv = torch.cat((R.permute(0, 2, 1), -R.permute(0, 2, 1) @ t), dim=2)
+    P_inv = torch.cat(
         (P_inv, P.new_tensor([[0.0, 0.0, 0.0, 1.0]])[None, ...].repeat(B, 1, 1)), dim=1
     )
     return P_inv
@@ -494,9 +496,9 @@ def change_reference_3D_points(
     xyz0_hom = to_homogeneous(xyz0)  # B,n,4
     if cast_to_double:
         original_dtype = xyz0.dtype
-        P0_inv = invert_P(P0.to(th.double))
+        P0_inv = invert_P(P0.to(torch.double))
         xyz1_hom = (
-            P1.to(th.double) @ P0_inv @ xyz0_hom.permute(0, 2, 1).to(th.double)
+            P1.to(torch.double) @ P0_inv @ xyz0_hom.permute(0, 2, 1).to(torch.double)
         )  # B,4,n
         xyz1 = from_homogeneous(xyz1_hom.permute(0, 2, 1)).to(original_dtype)  # B,n,3
     else:
@@ -561,7 +563,7 @@ def project_to_2D(
     """
     original_dtype = xyz.dtype
     # B,3,3 * B,3,n =  B,3,n  -> B,n,3 after permutation
-    xy_proj_hom = (K.to(th.double) @ xyz.permute(0, 2, 1).to(th.double)).permute(
+    xy_proj_hom = (K.to(torch.double) @ xyz.permute(0, 2, 1).to(torch.double)).permute(
         0, 2, 1
     )
     xy_proj = from_homogeneous(xy_proj_hom).to(original_dtype)  # B,n,2
