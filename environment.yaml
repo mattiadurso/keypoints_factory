@@ -1,4 +1,4 @@
-name: keypoint_factory
+name: keypoint_factory_test
 channels:
   - conda-forge
   - defaults
@@ -121,7 +121,6 @@ dependencies:
       - ml-dtypes==0.5.1
       - mpmath==1.3.0
       - multidict==6.4.2
-      - mylib==0.1.0
       - networkx==3.4.2
       - numpy==1.26.4
       - nvidia-cublas-cu12==12.4.5.8
