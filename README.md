@@ -269,10 +269,6 @@ That’s it, you’re ready to benchmark.
 
 ## TODO 
 
-#### MISC
-* [ ] final test with all
-
-
 #### Benchmarks
 * [ ] IMC
     - add multiview support, now only stereo
