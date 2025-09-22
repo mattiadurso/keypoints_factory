@@ -14,7 +14,6 @@ import pydegensac
 import torch as th
 import numpy as np
 import pandas as pd
-from PIL import Image
 from torch import Tensor
 from tqdm.auto import tqdm
 from functools import partial
@@ -96,9 +95,8 @@ def extract_image_matching_benchmark(
         imgs_bar = tqdm(imgs_paths, position=1)
         for img_path in imgs_bar:
             img_name = img_path.stem
-            img_np = np.array(Image.open(img_path))
+            img = wrapper.load_image(img_path)
             with th.no_grad():
-                img = wrapper.img_from_numpy(img_np)
                 output = wrapper.extract(img, max_kpts=max_kpts)
 
             keypoints[img_name] = output["kpts"].cpu()
@@ -350,6 +348,7 @@ def run_benchmark(
     scenes_set: str,
     num_kpts: int = 2048,
     multiview: bool = False,
+    run_viz: bool = False,
 ) -> str:
     json_path, method_name_json = generate_json(
         method_name, matcher_name, num_kpts=num_kpts
@@ -368,6 +367,8 @@ def run_benchmark(
             str(multiview).lower(),
             "--parallel",
             "1",
+            "--run_viz",
+            str(run_viz).lower(),
         ],
         cwd=abs_root_path / "imc/image-matching-benchmark",
     )
