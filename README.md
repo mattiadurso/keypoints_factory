@@ -223,7 +223,6 @@ That’s it, you’re ready to benchmark.
 ## TODO 
 
 #### MISC
-* [ ] update env file at the end
 * [ ] final test with all
 
 
