@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--wrapper-name", type=str, default="superpoint")
+    parser.add_argument("--wrapper-name", type=str, default="disk-kornia")
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--max-kpts", type=int, default=2048)
     parser.add_argument("--th", type=float, default=1.0)

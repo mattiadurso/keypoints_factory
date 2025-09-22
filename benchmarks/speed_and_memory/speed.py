@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--wrapper-name", type=str, default="superpoint")
+    parser.add_argument("--wrapper-name", type=str, default="disk-kornia")
     parser.add_argument(
         "--scaling-factor", type=float, default=1.0, help="Scaling factor for images"
     )
