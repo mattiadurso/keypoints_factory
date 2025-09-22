@@ -10,7 +10,7 @@ SANDesc is supported but not released yet, thus those parts are commented.
 
 ```bash
 # from the repo root
-conda env create -f environment.yaml && \
+conda env create -f environment.yaml && \  # there might be more dependencies than needed here
 conda activate keypoint_factory  # or . ./activate_env.sh if you are lazy
 ```
 Otherwise, the following packages can be manually installed:
@@ -226,8 +226,6 @@ That’s it, you’re ready to benchmark.
 * [ ] update env file at the end
 * [ ] final test with all
 
-#### Notebooks/Results
-* [ ] unify displaying functions names in read results
 
 #### Benchmarks
 * [ ] IMC
