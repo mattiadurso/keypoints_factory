@@ -21,7 +21,6 @@ except ImportError:
     pynvml = None
 import logging
 import numpy as np
-from PIL import Image
 from tqdm import tqdm
 
 # Setup logging
@@ -31,9 +30,9 @@ logger = logging.getLogger(__name__)
 
 def get_vram_usage(gpu_index=0):
     if pynvml is None:
-        logger.warning(
-            "pynvml is not available, cannot get VRAM usage. You can install it with pip install nvidia-ml-py"
-        )
+        # logger.warning(
+        #     "pynvml is not available, cannot get VRAM usage. You can install it with pip install nvidia-ml-py"
+        # )
         return 0
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
@@ -53,11 +52,14 @@ def measure(
     data = []
     # read images, using GHR images
     for img_path in tqdm(image_paths, desc="Reading images"):
-        img = Image.open(img_path).convert("RGB")
-        H, W = img.size
-        newH, newW = int(H * scaling_factor), int(W * scaling_factor)
-        img = img.resize((newH, newW), Image.LANCZOS)
-        img = wrapper.img_from_numpy(np.array(img)).cpu()
+        # img = Image.open(img_path).convert("RGB")
+        # H, W = img.size
+        # newH, newW = int(H * scaling_factor), int(W * scaling_factor)
+        # img = img.resize((newH, newW), Image.LANCZOS)
+        # img = wrapper.img_from_numpy(np.array(img)).cpu()
+        img = wrapper.load_image(img_path, scaling=scaling_factor).cpu()
+        H, W = img.shape[-2:]
+
         data.append(img)
 
     # warmup
@@ -92,7 +94,7 @@ def measure(
     mean_syn = np.sum(timings) / r  # in milliseconds
     std_syn = np.std(timings)
     vram = np.max(vram)
-    return {"mean": mean_syn, "std": std_syn, "image_size": (newH, newW), "vram": vram}
+    return {"mean": mean_syn, "std": std_syn, "image_size": (H, W), "vram": vram}
 
 
 if __name__ == "__main__":
@@ -176,3 +178,6 @@ if __name__ == "__main__":
     }
     with open(res_path, "w") as f:
         json.dump(results, f, indent=4)
+
+    logger.info(f"Results saved to {res_path}.")
+    logger.info(f"Results: {results[key]}")
