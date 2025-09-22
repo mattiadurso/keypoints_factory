@@ -5,7 +5,6 @@ import random
 import logging
 import argparse
 import numpy as np
-from PIL import Image
 import torch.nn.functional as F
 
 # Setup logging
