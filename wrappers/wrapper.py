@@ -3,13 +3,13 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Union, Tuple, List, Any, Optional
 
-import h5py
+import cv2
 import torch
-from PIL import Image
-from torch import Tensor
-from torchvision import transforms
-from torch.nn import functional as F
 import numpy as np
+from torch import Tensor
+
+# from torchvision import transforms
+from torch.nn import functional as F
 from abc import ABC, abstractmethod
 
 
@@ -67,7 +67,6 @@ class MethodWrapper(ABC):
         self.name = name
         self.border = border
         self.device = device
-        self.to_torch = transforms.ToTensor()
         self.custom_descriptor = None
         self.matcher = None
 
@@ -77,17 +76,41 @@ class MethodWrapper(ABC):
             print("Using automatic mixed precision.")
         self.amp_dtype = torch.float16
 
-    def load_image(self, path):
-        img = np.array(Image.open(path))
-        return self.img_from_numpy(img)
-
-    def img_from_numpy(self, img: np.ndarray) -> Union[Tensor, np.ndarray]:
-        assert (
-            img.dtype == np.uint8
-        ), f"Image must be uint8, got {img.dtype}"  # otherwise no scaling in ToTensor()
+    def load_image(self, path, scaling=1.0):
+        """
+        Load image from path, convert to float32 tensor in [0, 1], resize if needed,
+        and crop to multiple of 16."""
+        img = self.read_image(str(path)) / 255.0  # 3, H, W, float32 [0, 1]
+        # resize if needed
+        if scaling != 1.0:
+            img = F.interpolate(
+                img.unsqueeze(0),
+                scale_factor=scaling,
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(0)
+        # crop to multiple of 16
         img = self.crop_multiple_of(img, multiple_of=16)
-        img_out = self.to_torch(img).to(self.device)
-        return img_out
+
+        return img.to(self.device)
+
+    def read_image(self, path):
+        """
+        Read image with OpenCV and convert to RGB.
+        Returns a tensor uint8 CxHxW in [0,255].
+        """
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)  # HxWxC (BGR) or HxW (gray)
+        if img is None:
+            raise FileNotFoundError(path)
+
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        t = torch.from_numpy(img)  # HxWxC, uint8/uint16
+        t = t.permute(2, 0, 1).contiguous()  # CxHxW
+        return t
 
     def crop_multiple_of(self, img, multiple_of=16):
         if isinstance(img, np.ndarray):
