@@ -30,11 +30,11 @@ from benchmarks.benchmark_utils import (
     str2bool,
     fix_rng,
     convert_numpy_types,
-    display_hpatches_results,
 )
 from benchmarks.hpatches.hpatches_benchmark_utils import (
     load_hpatches_in_memory,
     compute_matching_stats,
+    display_hpatches_results,
 )
 
 # Setup logging
@@ -50,7 +50,7 @@ class HPatchesBenchmark:
         data_path: str = "benchmarks/hpatches/data/hpatches-sequences-release",
         max_kpts: int = 2048,
         thresholds: List[float] = [1, 2, 3, 4, 5],
-        n_jobs: int = -1,
+        njobs: int = -1,
         mnn_min_score: float = 0.0,
         mnn_ratio_test: float = 1.0,
         seed: int = 42,
@@ -62,9 +62,7 @@ class HPatchesBenchmark:
         self.results = {}
         self.max_kpts = max_kpts
         self.thresholds = thresholds
-        self.n_jobs = (
-            n_jobs if n_jobs != -1 else int(mp.cpu_count() * 0.9)
-        )  # might not be a good idea to use all cores
+        self.njobs = njobs
         self.mnn_min_score = mnn_min_score
         self.mnn_ratio_test = mnn_ratio_test
         self.seed = seed
@@ -121,7 +119,7 @@ class HPatchesBenchmark:
             descriptors = features_dict["descriptors"]
             logger.info(f"Loaded features from {self.feature_path}.")
 
-        # match - FIXED VERSION
+        # match all pairs
         wrapper.matcher = self.matcher
         matches = {folder_name: {} for folder_name in descriptors}
         for folder_name, des_folder in tqdm(descriptors.items(), f"Matching keypoints"):
@@ -137,7 +135,7 @@ class HPatchesBenchmark:
             aggregated_df,
             stats_homography_df,
             aggregated_homography_accuracy_df,
-        ) = compute_matching_stats(keypoints, matches, hpatches, n_jobs=self.n_jobs)
+        ) = compute_matching_stats(keypoints, matches, hpatches, njobs=self.njobs)
 
         # csv
         if self.save_csv:
@@ -293,12 +291,12 @@ if __name__ == "__main__":
     parser.add_argument("--custom-desc", type=str, default=None)
     parser.add_argument("--stats", type=str2bool, default=False)
     parser.add_argument("--save-csv", type=str2bool, default=True)
-    parser.add_argument("--n-jobs", type=int, default=-1)  # mt not implemented yet
+    parser.add_argument("--njobs", type=int, default=16)
     parser.add_argument(
         "--thresholds",
         type=float,
         nargs="+",
-        default=[1, 2, 3, 4, 5],  # reducing to 1 2 3
+        default=[1, 2, 3, 4, 5],
         help="List of thresholds for repeatability and matching score computation",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -310,7 +308,7 @@ if __name__ == "__main__":
     max_kpts = args.max_kpts
     custom_desc = args.custom_desc
     thresholds = args.thresholds
-    n_jobs = args.n_jobs
+    njobs = args.njobs
     seed = args.seed
     feature_path = args.feature_path
     save_csv = args.save_csv
@@ -372,7 +370,7 @@ if __name__ == "__main__":
 
     logger.info(f"\n\n>>> Running HPatches benchmark for {key}...<<<\n")
     logger.info(f"Using thresholds: {thresholds}")
-    logger.info(f"Using {n_jobs} jobs for parallel computation")
+    logger.info(f"Using {njobs} jobs for parallel computation")
     logger.info(
         f"Using MNN matcher with min_score: {mnn_min_score}, ratio_test: {mnn_ratio_test}"
     )
@@ -392,7 +390,7 @@ if __name__ == "__main__":
     benchmark = HPatchesBenchmark(
         max_kpts=max_kpts,
         thresholds=thresholds,
-        n_jobs=n_jobs,
+        njobs=njobs,
         mnn_min_score=mnn_min_score,
         mnn_ratio_test=mnn_ratio_test,
         seed=seed,
