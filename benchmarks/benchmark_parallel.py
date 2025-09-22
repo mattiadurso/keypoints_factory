@@ -210,7 +210,9 @@ class Benchmark:
                 continue
 
         # free memory, this stuff is no longer needed
-        del wrapper, img, out, Z, Z_sampled
+        if self.compute_repeatability:
+            del Z, Z_sampled
+        del wrapper, img, out
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -338,7 +340,8 @@ class Benchmark:
             # average over all pairs
             for k in rep_results:
                 rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
-
+        else:
+            rep_results = {}
         return matches_dict, rep_results
 
     def batch_pose_estimation(self, matches_dict):
