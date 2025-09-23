@@ -21,9 +21,7 @@ pip install torch==2.6.0+cu124 torchvision==0.21.0+cu124 --index-url https://dow
 pip install \
   opencv-python==4.11.0.86 \
   h5py==3.13.0 \
-  Pillow==11.1.0 \
   numpy==1.26.4 \
-  matplotlib==3.10.1 \
   kornia==0.8.0 \
   pyyaml==6.0.2 \
   joblib==1.4.2 \
@@ -31,12 +29,16 @@ pip install \
   pandas==2.2.3 \
   pydegensac==0.1.2
 
-# and optionally 
+## Suggested but optional
+# matplotlib: used for demo and plotting val results in read_results.ipynb
 # nvidia-ml-py: to measure VARM usage
+# PIL: used in some visualisaztions, but not stricly needed for benchmarking
 # xformers: to increse speed when using transformer-based models models
 pip install \
+  matplotlib==3.10.1 \
   nvidia-ml-py==13.580.82 \
-  xformers==0.0.29.post2
+  Pillow==11.1.0 \
+  xformers==0.0.29.post2 
 
 # to run imc, those are also needed
 pip install \
@@ -268,6 +270,12 @@ That’s it, you’re ready to benchmark.
 
 
 ## TODO 
+
+#### MISC
+* [ ] reduce dependencies
+    - like PIL 
+    - maybe set plt and pandas as optional for visuals
+    - pydedensac -> kornia ransac
 
 #### Benchmarks
 * [ ] IMC
