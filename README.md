@@ -15,6 +15,9 @@ conda activate keypoint_factory      # Or . ./activate_env.sh if you are lazy
 ```
 Alternatively, the following packages can be manually installed:
 ```bash
+# Create conda env
+conda create -n keypoint_factory python=3.10.16
+
 # Install PyTorch with CUDA 12.4 support
 pip install torch==2.6.0+cu124 torchvision==0.21.0+cu124 --index-url https://download.pytorch.org/whl/cu124
 
