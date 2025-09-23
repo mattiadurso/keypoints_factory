@@ -232,7 +232,7 @@ def get_best_device(verbose=False):
     return device
 
 
-def estimate_pose(kpts0, kpts1, K0, K1, norm_thresh, conf=0.99999):
+def estimate_pose(kpts0, kpts1, K0, K1, norm_thresh, conf=0.999999, maxIters=10_000):
     """Estimate pose using essential matrix"""
     if len(kpts0) < 5:
         return None
@@ -242,7 +242,13 @@ def estimate_pose(kpts0, kpts1, K0, K1, norm_thresh, conf=0.99999):
     kpts0 = (K0inv @ (kpts0 - K0[None, :2, 2]).T).T
     kpts1 = (K1inv @ (kpts1 - K1[None, :2, 2]).T).T
     E, mask = cv2.findEssentialMat(
-        kpts0, kpts1, np.eye(3), threshold=norm_thresh, prob=conf
+        kpts0,
+        kpts1,
+        cameraMatrix=np.eye(3),
+        threshold=norm_thresh,
+        prob=conf,
+        maxIters=maxIters,
+        method=cv2.RANSAC,
     )
 
     ret = None
