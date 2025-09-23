@@ -3,7 +3,6 @@ import gc
 import warnings
 import torch
 import torch.nn.functional as F
-from torchvision import transforms
 
 from pathlib import Path
 
@@ -45,9 +44,8 @@ class DeDoDeWrapper(MethodWrapper):
                 device=device,
             )
 
-        self.normalizer = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
+        self.mean = [0.485, 0.456, 0.406]
+        self.std = [0.229, 0.224, 0.225]
 
     def add_custom_descriptor(self, model):
         self.custom_descriptor = model
@@ -65,7 +63,7 @@ class DeDoDeWrapper(MethodWrapper):
         if self.descriptor_G:
             x = self.crop_multiple_of(x, multiple_of=14)
 
-        batch = {"image": self.normalizer(x)}
+        batch = {"image": self.normalize_image(x, self.mean, self.std)}
 
         with torch.amp.autocast(
             device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp

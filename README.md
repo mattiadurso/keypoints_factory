@@ -21,7 +21,9 @@ conda activate keypoint_factory      # Or . ./activate_env.sh if you are lazy
 
 
 # Install PyTorch with CUDA 12.4 support
-pip install torch==2.6.0+cu124 torchvision==0.21.0+cu124 --index-url https://download.pytorch.org/whl/cu124
+pip install \
+  torch==2.6.0+cu124 \
+  --index-url https://download.pytorch.org/whl/cu124
 
 pip install \
   h5py==3.13.0 \
@@ -31,7 +33,7 @@ pip install \
   opencv-python==4.11.0.86 \
   pandas==2.2.3 \
   tqdm==4.67.1 \
-  pydegensac==0.1.2 
+  pydegensac==0.1.2
 
 ## Suggested but optional
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
@@ -273,7 +275,7 @@ That’s it, you’re ready to benchmark.
 #### MISC
 * [ ] Reduce dependencies
     - __pandas__ is used only in Hpatches and read_results, can be put as optional
-    - __cv2__ can be replaced with pydegensac/kornia pose estimation/recover pose, or vice versa. 
+    - __cv2__ can be replaced with pydegensac+kornia (gemo. estim.) and torchvision for I/O
 
 #### Benchmarks
 * [ ] IMC
