@@ -279,6 +279,7 @@ That’s it, you’re ready to benchmark.
     - Add multiview support, now only stereo
 * [ ] Add support for matchers (LoFTR, RoMA, etc)
 * [ ] Maybe unify printing function names
+* [ ] Add MD Air-to-Ground and MD View from RDD
 
 
 
