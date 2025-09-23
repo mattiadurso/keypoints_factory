@@ -212,8 +212,6 @@ python benchmarks/speed_and_memory/speed.py
 ```
 
 
-
-
 ### Why This Repo?
 
 I couldn’t find a single, unified, and reproducible way to **benchmark feature extractors** quickly. Setting up fair benchmarks shouldn’t steal time from research—so this repo aims to make it fast and consistent.
@@ -249,14 +247,13 @@ That’s it, you’re ready to benchmark.
 
 #### MISC
 * [ ] Reduce dependencies
-    - __pandas__ is used only in Hpatches and read_results, can be put as optional
+    - __pandas__ is used only in Hpatches and read_results, can be eventually put as optional
     - __cv2__ can be replaced with pydegensac+kornia (gemo. estim.) and torchvision for I/O
 
 #### Benchmarks
 * [ ] IMC
     - Add multiview support, now only stereo
 * [ ] Add support for matchers (LoFTR, RoMA, etc)
-* [ ] Maybe unify printing function names
 * [ ] Add MD Air-to-Ground and MD View from RDD
 
 
