@@ -29,8 +29,7 @@ pip install \
   opencv-python==4.11.0.86 \
   pandas==2.2.3 \
   tqdm==4.67.1 \
-  pydegensac==0.1.2 \
-  pyyaml==6.0.2 
+  pydegensac==0.1.2 
 
 ## Suggested but optional
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
@@ -45,7 +44,7 @@ pip install \
 
 # To run IMC, these are also needed
 pip install \
-  matplotlib==3.10.1 \  
+  matplotlib==3.10.1 \
   schema \
   scipy \
   shortuuid \
@@ -61,7 +60,7 @@ Edit `download_wrappers.py` to choose which method to download. An empty list me
 python download_wrappers.py && \
 bash bash/download_all.sh
 ```
-To download only one benchmark, use the corresponding bash file in ```bash/```.
+To download only one benchmark, use the corresponding bash file in ```bash/```. The deafult wrapper is `disk-kornia`, which is already available when installing Kornia, and can be used to test if everything works.
 
 ### 3) Test in the Notebook
 In `demo.ipynb`, it is possible to test the wrappers on images from the Graz High-Resolution Benchmark, visualizing keypoints/matches and sanity-checking that everything works.
