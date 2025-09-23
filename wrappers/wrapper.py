@@ -85,7 +85,7 @@ class MethodWrapper(ABC):
         if scaling != 1.0:
             img = F.interpolate(
                 img.unsqueeze(0),
-                scale_factor=scaling,
+                scale_factor=1 / scaling,
                 mode="bilinear",
                 align_corners=False,
             ).squeeze(0)
