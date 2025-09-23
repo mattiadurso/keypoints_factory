@@ -12,6 +12,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+import gc
 import time
 import json
 import torch
@@ -82,8 +83,8 @@ class HPatchesBenchmark:
         keypoints = {folder_name: [] for folder_name in hpatches}
         descriptors = {folder_name: [] for folder_name in hpatches}
         for folder_name, data in tqdm(hpatches.items(), f"Extracting keypoints"):
-            for img_np in data["imgs"]:
-                img = wrapper.img_from_numpy(img_np)
+            for img in data["imgs"]:
+                # img = wrapper.img_from_numpy(img_np)
                 output = wrapper.extract(img, max_kpts=self.max_kpts)
                 keypoints[folder_name].append(output.kpts.cpu())
                 descriptors[folder_name].append(output.des.cpu())
@@ -106,7 +107,7 @@ class HPatchesBenchmark:
         fix_rng(seed=self.seed)
 
         # first load all images
-        hpatches = load_hpatches_in_memory(self.data_path)
+        hpatches = load_hpatches_in_memory(wrapper, self.data_path)
 
         # Phase 1: Extract all features
         if self.feature_path is None:
@@ -127,7 +128,11 @@ class HPatchesBenchmark:
                 # Remove the extra list wrapping
                 matches[folder_name][f"1_{i}"] = wrapper.match(
                     [des_folder[0]], [des_folder[i - 1]]
-                )[0].matches
+                )[0].matches.cpu()
+
+        # ensure all is on cpu to avoid GPU OOM issues
+        for scene in hpatches.keys():
+            hpatches[scene]["imgs"] = [img.cpu() for img in hpatches[scene]["imgs"]]
 
         # compute metrics
         (
@@ -282,7 +287,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--wrapper-name", type=str, default="superpoint")
+    parser.add_argument("--wrapper-name", type=str, default="disk-kornia")
     parser.add_argument("--max-kpts", type=int, default=2048)
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--min-score", type=float, default=0.5)

@@ -4,7 +4,6 @@ import torch
 import logging
 import numpy as np
 import pandas as pd
-from PIL import Image
 from tqdm import tqdm
 from torch import Tensor
 from pathlib import Path
@@ -17,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def load_hpatches_in_memory(root: str | Path, max_workers: int = 16) -> Dict:
+def load_hpatches_in_memory(wrapper, root: str | Path, max_workers: int = 16) -> Dict:
     """
     Load HPatches into memory with multi-threaded I/O.
     Returns: dict[name] -> {"imgs": [6 np arrays], "homs": [6 (3x3) np arrays]}
@@ -31,7 +30,7 @@ def load_hpatches_in_memory(root: str | Path, max_workers: int = 16) -> Dict:
     def _load_one(scene: Path):
         imgs, homs = [], []
         for j in range(1, 7):
-            img = np.array(Image.open(scene / f"{j}.ppm"))
+            img = wrapper.load_image(scene / f"{j}.ppm")
             H = (
                 np.eye(3, dtype=np.float64)
                 if j == 1
@@ -66,25 +65,6 @@ def convert_numpy_types(obj):
         return obj
 
 
-def two_vector_idxs_to_matching_matrix(
-    matches: Tensor, n_kpts0: int, n_kpts1: int
-) -> Tensor:
-    """convert the input two vector idx notation to matching matrix
-    Args:
-        matches: the input matches in the two vector idx notation
-            n,2
-        n_kpts0: the number of keypoints in the first image
-        n_kpts1: the number of keypoints in the second image
-    output
-        matching_matrix   n_kpts x n_kpts bool
-    """
-    matching_matrix = matches.new_zeros(
-        n_kpts0, n_kpts1, dtype=torch.bool, device=matches.device
-    )
-    matching_matrix[matches[:, 0], matches[:, 1]] = True
-    return matching_matrix
-
-
 def filter_outside(
     xy: Tensor, shape: tuple[int, int] | Tensor | np.ndarray, border: int = 0
 ) -> Tensor:
@@ -117,51 +97,74 @@ def filter_outside(
 
 
 def warp_points(
-    xy: Tensor,
-    H: Tensor,
-    img_shape: tuple[float, float] | Tensor | np.ndarray | None = None,
+    xy: torch.Tensor,
+    H: torch.Tensor,
+    img_shape: tuple[float, float] | torch.Tensor | np.ndarray | None = None,
     border: int = 0,
-) -> Tensor:
-    """warp the points using the provided homography matrix
-    Args:
-        xy: input points coordinates with order (x, y)
-           B,n,2
-        H: input homography
-           B,3,3
-        img_shape: if provided, the points that project out of shape are set to 'nan'
-        border: together with img_shape, set to nan the points that are closer to the border than this
-    Returns:
-        Tensor: the projected points
-           B,n,2
+) -> torch.Tensor:
     """
-    assert (
-        xy.shape[0] == H.shape[0]
-    ), f"xy.shape[0] = {xy.shape[0]} != H.shape[0] = {H.shape[0]}"
-    assert xy.shape[2] == 2, f"xy must be B,n,2 but is {xy.shape}"
-    assert H.shape[1] == 3 and H.shape[2] == 3, f"H must be B,3,3 but is {H.shape}"
-    if img_shape is not None:
-        assert len(img_shape) == 2
+    Warp 2D points using a homography.
 
-    # xy_hom = geom.convert_points_to_homogeneous(xy.to(H.dtype))  # B,n,3
-    xy_hom = torch.cat(
-        (
-            xy,
-            torch.ones((xy.shape[0], xy.shape[1], 1), dtype=xy.dtype, device=xy.device),
-        ),
-        dim=2,
-    ).to(
-        H.dtype
-    )  # B,n,3
-    xy_proj_hom = xy_hom @ H.to(xy.device).permute(0, 2, 1)  # B,n,3
-    # xy_proj = geom.convert_points_from_homogeneous(xy_proj_hom)   # B
-    xy_proj = xy_proj_hom[:, :, 0:2] / xy_proj_hom[:, :, 2:3]  # B,n,2
+    Args:
+        xy: points in (x, y) order. Shape:
+            - (N, 2) for single set, or
+            - (B, N, 2) for batched sets
+        H: homography(ies). Shape:
+            - (3, 3) for single H, or
+            - (B, 3, 3) for batched H
+           If one of (xy or H) is batched and the other is single, the single one
+           is broadcast across the batch.
+        img_shape: if provided (H, W), points projected outside (with optional border)
+                   are set to NaN.
+        border: with img_shape, mark points within `border` pixels of the boundary as NaN.
+
+    Returns:
+        Projected points with the same rank as `xy`:
+            - (N, 2) if input xy was (N, 2)
+            - (B, N, 2) if input xy was (B, N, 2)
+    """
+    assert xy.ndim in (2, 3), f"xy must be (N,2) or (B,N,2), got {xy.shape}"
+    assert H.ndim in (2, 3), f"H must be (3,3) or (B,3,3), got {H.shape}"
+    if img_shape is not None:
+        assert len(img_shape) == 2, "img_shape must be (H, W)"
+
+    single_xy = xy.ndim == 2  # (N,2)
+    single_H = H.ndim == 2  # (3,3)
+
+    # Add batch dimension if needed
+    xy_b = xy[None, ...] if single_xy else xy  # (B?,N,2)
+    H_b = H[None, ...] if single_H else H  # (B?,3,3)
+
+    # Broadcast batch if one side has B=1
+    B_xy, N = xy_b.shape[0], xy_b.shape[1]
+    B_H = H_b.shape[0]
+    if B_xy != B_H:
+        if B_xy == 1:
+            xy_b = xy_b.expand(B_H, -1, -1)
+        elif B_H == 1:
+            H_b = H_b.expand(B_xy, -1, -1)
+        else:
+            raise AssertionError(
+                f"Incompatible batch sizes: xy batch={B_xy}, H batch={B_H}"
+            )
+
+    # Compute homogeneous projection
+    ones = torch.ones(
+        (xy_b.shape[0], xy_b.shape[1], 1), dtype=xy_b.dtype, device=xy_b.device
+    )
+    xy_hom = torch.cat([xy_b, ones], dim=2).to(H_b.dtype)  # (B,N,3)
+    xy_proj_hom = xy_hom @ H_b.to(xy_b.device).permute(0, 2, 1)  # (B,N,3)
+
+    den = xy_proj_hom[:, :, 2:3].clamp(min=1e-8)  # numerical safety
+    xy_proj = xy_proj_hom[:, :, 0:2] / den  # (B,N,2)
 
     if img_shape is not None:
-        xy_proj = filter_outside(xy_proj, img_shape, border)
+        xy_proj = filter_outside(xy_proj, img_shape, border)  # (B,N,2)
 
     xy_proj = xy_proj.to(xy.dtype)
 
-    return xy_proj
+    # Return same rank as input xy
+    return xy_proj[0] if single_xy else xy_proj
 
 
 def compute_homography_corner_error(
@@ -397,104 +400,6 @@ def find_distance_matrices_between_points_and_their_projections(
     return dist0, dist1
 
 
-def find_mutual_nearest_neighbors_from_keypoints_and_their_projections(
-    xy0: Tensor,
-    xy1: Tensor,
-    xy0_proj: Tensor,
-    xy1_proj: Tensor,
-    dist0: Tensor | None = None,
-    dist1: Tensor | None = None,
-) -> (Tensor, Tensor, Tensor, Tensor, Tensor):
-    """find the mutual nearest neighbors between two sets of keypoints and their projections
-    Args:
-        xy0: first set of keypoints
-            n0,2
-        xy1: second set of keypoints
-            n1,2
-        xy0_proj: first set of projected keypoints
-            n0_proj,2
-        xy1_proj: second set of projected keypoints
-            n1_proj,2
-        dist0: optional distance matrix between xy0 and xy1_proj, if not provided it will be computed
-            n0,n1
-        dist1: optional distance matrix between xy0_proj and xy1, if not provided it will be computed
-            n0,n1
-    Returns:
-        mnn_mask: binary mask of mutual nearest neighbors
-            n0,n1
-        xy0_closest_dist_mnn: for each xy0 that has a mutual nearest neighbor, the distance to the closest xy1_proj in img0
-            n0_mnn
-        xy1_closest_dist_mnn: for each xy1 that has a mutual nearest neighbor, the distance to the closest xy0_proj in img1
-            n1_mnn
-        xy0_closest_dist: for each xy0, the distance to the closest xy1_proj in img0
-            n0
-        xy1_closest_dist: for each xy1, the distance to the closest xy0_proj in img1
-            n1
-    """
-    assert (
-        xy0.ndim == 2 and xy1.ndim == 2
-    ), f"xy0 and xy1 must be 2D tensors, got {xy0.ndim} and {xy1.ndim}"
-    assert (
-        xy0_proj.ndim == 2 and xy1_proj.ndim == 2
-    ), f"xy0_proj and xy1_proj must be 2D tensors, got {xy0_proj.ndim} and {xy1_proj.ndim}"
-    if dist0 is not None:
-        assert dist0.shape == (
-            xy0.shape[0],
-            xy1_proj.shape[0],
-        ), f"dist0 must be a matrix of shape ({xy0.shape[0]}, {xy1.shape[0]}), got {dist0.shape}"
-    if dist1 is not None:
-        assert dist1.shape == (
-            xy0.shape[0],
-            xy1_proj.shape[0],
-        ), f"dist1 must be a matrix of shape ({xy0.shape[0]}, {xy1.shape[0]}), got {dist1.shape}"
-
-    device = xy0.device
-
-    n0 = xy0.shape[0]
-    n1 = xy1.shape[0]
-
-    if dist0 is None and dist1 is None:
-        dist0, dist1 = find_distance_matrices_between_points_and_their_projections(
-            xy0, xy1, xy0_proj, xy1_proj
-        )
-
-    if n1 > 0:
-        # ? find the closest point in the image between each xy0 and xy1_proj
-        xy0_closest_dist, closest0 = dist0.min(1)
-    else:
-        xy0_closest_dist, closest0 = torch.zeros((0,), device=device), torch.zeros(
-            (0,), dtype=torch.long, device=device
-        )  # n0
-    if n0 > 0:
-        # ? find the closest point in the image between each xy1 and xy0_proj
-        xy1_closest_dist, closest1 = dist1.min(0)
-    else:
-        xy1_closest_dist, closest1 = torch.zeros((0,), device=device), torch.zeros(
-            (0,), dtype=torch.long, device=device
-        )  # n1
-
-    xy0_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
-    xy1_closest_matrix = torch.zeros(dist0.shape, dtype=torch.bool, device=device)
-    if n1 > 0:
-        xy0_closest_matrix[torch.arange(len(xy0)), closest0] = True
-    if n0 > 0:
-        xy1_closest_matrix[closest1, torch.arange(len(xy1))] = True
-    # ? fink the keypoints that are mutual nearest neighbors (using only x,y coordinates) in both images
-    mnn_mask = xy0_closest_matrix & xy1_closest_matrix
-    mnn_idx = mnn_mask.nonzero()
-    xy0_closest_dist_mnn = torch.ones_like(xy0_closest_dist) * float("inf")
-    xy1_closest_dist_mnn = torch.ones_like(xy1_closest_dist) * float("inf")
-    xy0_closest_dist_mnn[mnn_idx[:, 0]] = xy0_closest_dist[mnn_idx[:, 0]]
-    xy1_closest_dist_mnn[mnn_idx[:, 1]] = xy1_closest_dist[mnn_idx[:, 1]]
-    return (
-        mnn_mask,
-        xy0_closest_dist_mnn,
-        xy1_closest_dist_mnn,
-        xy0_closest_dist,
-        xy1_closest_dist,
-    )
-
-
 def compute_coverages(
     xy0: Tensor,
     xy1: Tensor,
@@ -601,18 +506,6 @@ def _safe_div(num, den):
     return (num / den) if den > 0.0 else 0.0
 
 
-def _warp_points(xy: torch.Tensor, H: torch.Tensor) -> torch.Tensor:
-    """xy: (N,2), H: (3,3) -> (N,2)"""
-    N = xy.shape[0]
-    if N == 0:
-        return xy.clone()
-    ones = torch.ones((N, 1), dtype=xy.dtype, device=xy.device)
-    xy1 = torch.cat([xy, ones], dim=1)  # (N,3)
-    w = xy1 @ H.T  # (N,3)
-    w = w[:, :2] / w[:, 2:].clamp(min=1e-8)
-    return w
-
-
 def _inside(shape_hw, xy: torch.Tensor) -> torch.Tensor:
     """Return mask of points inside image (h,w). Uses half-open range [0,w) and [0,h)."""
     h, w = int(shape_hw[0]), int(shape_hw[1])
@@ -645,8 +538,8 @@ def compute_matching_stats_homography(
     H1_0 = torch.inverse(H0_1)
     matches = _as_long2(matches, device)
 
-    xy0_w = _warp_points(xy0, H0_1)
-    xy1_w = _warp_points(xy1, H1_0)
+    xy0_w = warp_points(xy0, H0_1)
+    xy1_w = warp_points(xy1, H1_0)
 
     m0 = _inside(img1_shape, xy0_w)
     m1 = _inside(img0_shape, xy1_w)
@@ -679,8 +572,8 @@ def compute_matching_stats_homography(
         i1 = matches[:, 1].clamp(min=0, max=max(0, xy1.shape[0] - 1))
         xy0_m = xy0[i0]
         xy1_m = xy1[i1]
-        xy0_m_w = _warp_points(xy0_m, H0_1)
-        xy1_m_w = _warp_points(xy1_m, H1_0)
+        xy0_m_w = warp_points(xy0_m, H0_1)
+        xy1_m_w = warp_points(xy1_m, H1_0)
         err_0to1 = (
             torch.linalg.norm(xy0_m_w - xy1_m, dim=1)
             if xy1_m.shape[0]
@@ -827,8 +720,8 @@ def compute_matching_stats(
         imgs = hpatches[folder_name]["imgs"]
         homs = hpatches[folder_name]["homs"]
 
-        img0_shape = imgs[0].shape[:2]
-        img1_shape = imgs[j].shape[:2]
+        img0_shape = imgs[0].shape[-2:]
+        img1_shape = imgs[j].shape[-2:]
         H01 = torch.as_tensor(homs[j], dtype=torch.float32)  # H_1_{j+1}
 
         xy0 = keypoints[folder_name][0]
@@ -881,8 +774,8 @@ def compute_matching_stats(
 
         return sdf, hdf
 
-    # Fan out across processes with a visible progress bar
-    results = Parallel(n_jobs=njobs, prefer="processes")(
+    # Using threads is faster here since each job is lightweight
+    results = Parallel(n_jobs=njobs, prefer="threads")(
         delayed(_compute_one_pair)(folder, j)
         for (folder, j) in tqdm(work, desc="Computing pairs")
     )

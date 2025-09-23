@@ -80,7 +80,7 @@ class MethodWrapper(ABC):
         """
         Load image from path, convert to float32 tensor in [0, 1], resize if needed,
         and crop to multiple of 16."""
-        img = self.read_image(str(path)) / 255.0  # 3, H, W, float32 [0, 1]
+        img = self.read_image_to_torch(str(path)) / 255.0  # 3, H, W, float32 [0, 1]
         # resize if needed
         if scaling != 1.0:
             img = F.interpolate(
@@ -94,7 +94,7 @@ class MethodWrapper(ABC):
 
         return img.to(self.device)
 
-    def read_image(self, path):
+    def read_image_to_torch(self, path):
         """
         Read image with OpenCV and convert to RGB.
         Returns a tensor uint8 CxHxW in [0,255].
