@@ -513,11 +513,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--skip-repeatability", action="store_false", help="Don't compute repeatability"
     )
-    parser.add_argument(
-        "--timestamp",
-        action="store_true",
-        help="Add timestamp to the save key for features",
-    )
     args = parser.parse_args()
 
     device = args.device
@@ -552,7 +547,6 @@ if __name__ == "__main__":
     keypoints_path = args.keypoints_path
     descriptors_path = args.descriptors_path
     compute_repeatability = args.skip_repeatability
-    timestamp = args.timestamp
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
@@ -640,8 +634,7 @@ if __name__ == "__main__":
     print("-------------------------------------------------------------")
 
     # Save the results
-    save_key = f"{feature_save_key}_{timestamp}" if timestamp else feature_save_key
-    data[save_key] = results
+    data[f"{key} {timestamp}"] = results
     with open(results_path / "results.json", "w") as f:
         json.dump(data, f)
 
