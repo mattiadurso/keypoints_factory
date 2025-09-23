@@ -8,12 +8,7 @@ SANDesc is supported but not released yet; thus, those parts might be commented 
 
 ### 1) Create the Environment
 
-```bash
-# From the repo root
-conda env create -f environment.yaml # There might be more dependencies than needed here
-conda activate keypoint_factory      # Or . ./activate_env.sh if you are lazy
-```
-Alternatively, the following packages can be manually installed:
+The following packages need to be installed:
 ```bash
 # Create conda env
 conda create -n keypoint_factory python=3.10.16
