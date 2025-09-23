@@ -232,23 +232,6 @@ def get_best_device(verbose=False):
     return device
 
 
-def recover_pose(E, kpts0, kpts1, K0, K1, mask):
-    """Recover pose from essential matrix"""
-    best_num_inliers = 0
-    K0inv = np.linalg.inv(K0[:2, :2])
-    K1inv = np.linalg.inv(K1[:2, :2])
-
-    kpts0_n = (K0inv @ (kpts0 - K0[None, :2, 2]).T).T
-    kpts1_n = (K1inv @ (kpts1 - K1[None, :2, 2]).T).T
-
-    for _E in np.split(E, len(E) / 3):
-        n, R, t, _ = cv2.recoverPose(_E, kpts0_n, kpts1_n, np.eye(3), 1e9, mask=mask)
-        if n > best_num_inliers:
-            best_num_inliers = n
-            ret = (R, t, mask.ravel() > 0)
-    return ret
-
-
 def estimate_pose(kpts0, kpts1, K0, K1, norm_thresh, conf=0.99999):
     """Estimate pose using essential matrix"""
     if len(kpts0) < 5:
