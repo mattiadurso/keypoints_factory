@@ -284,9 +284,10 @@ class Benchmark:
                 "t": t,
             }
 
-            # free memory, this stuff is no longer needed
-            del desc1, desc2, matches
-            torch.cuda.empty_cache()
+        # free memory, this stuff is no longer needed
+        del desc1, desc2, matches
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # Compute repeatability
         if self.compute_repeatability:
@@ -329,9 +330,30 @@ class Benchmark:
                 for b in rep:
                     for k in rep[b]:
                         rep_results[k].append(rep[b][k])
+
             # average over all pairs
             for k in rep_results:
                 rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
+
+            # clean up
+            del (
+                kpts1,
+                kpts2,
+                Z1,
+                Z2,
+                K1,
+                K2,
+                P1,
+                P2,
+                img1,
+                img2,
+                img1_size,
+                img2_size,
+                rep,
+            )
+            gc.collect()
+            torch.cuda.empty_cache()
+
         else:
             rep_results = {}
         return matches_dict, rep_results
@@ -400,13 +422,13 @@ class Benchmark:
         if save_key:
             features_save_key = f"{save_key}_{timestamp}"
 
+        # Phase 1: Batch matching (with feature extraction if needed)
+        matches_dict, rep_results = self.batch_match_all_pairs(
+            wrapper, device, save_key=features_save_key
+        )  # from here there is still something on GPU that need to be freed, but it shouldn't be a problem
+
         # Force loky backend for better isolation and reproducibility
         with parallel_backend("loky", n_jobs=self.njobs):
-            # Phase 1: Batch matching (with feature extraction if needed)
-            matches_dict, rep_results = self.batch_match_all_pairs(
-                wrapper, device, save_key=features_save_key
-            )  # for some reason it uses GPU memory (it shouldn't), but freeing wrapper works
-
             # Phase 2: Parallel pose estimation
             results = self.batch_pose_estimation(matches_dict)
 
@@ -554,7 +576,7 @@ if __name__ == "__main__":
     if custom_desc is not None:
         #  Eventually add my descriptors
         weights = torch.load(custom_desc, weights_only=False)
-        config = weights["config"]["model"]  # model_config for sandesc, model for dino
+        config = weights["config"]["model_config"]
         model = {
             "ch_in": config["unet_ch_in"],
             "kernel_size": config["unet_kernel_size"],
