@@ -1,4 +1,5 @@
 import cv2
+import math
 import json
 import torch
 import logging
@@ -469,6 +470,33 @@ def compute_coverages(
     )
 
     return coverage, coverage_per_kpt
+
+
+def _is_nan(x):
+    # Fast paths for common scalar types
+    if isinstance(x, float):
+        return math.isnan(x)
+    if isinstance(x, np.floating):
+        return np.isnan(x)
+
+    # Optional: if a torch tensor ever sneaks in
+    try:
+        import torch
+
+        if isinstance(x, torch.Tensor) and x.numel() == 1:
+            return bool(torch.isnan(x))
+    except Exception:
+        pass
+
+    # Fallbacks
+    try:
+        return bool(np.isnan(x))  # works for numpy scalars
+    except TypeError:
+        # Try interpreting "nan"/"NaN" strings, etc.
+        try:
+            return math.isnan(float(x))
+        except Exception:
+            return False
 
 
 def _as_float2(x, device):

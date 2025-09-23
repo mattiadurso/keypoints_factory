@@ -409,8 +409,6 @@ if __name__ == "__main__":
     # Add timing info to results
     results["benchmark_time_seconds"] = float(total_time)
 
-    print(f"Total time: {total_time:.1f} seconds")
-
     # Convert numpy types before saving to JSON
     serializable_results = convert_numpy_types(results)
 
@@ -419,7 +417,9 @@ if __name__ == "__main__":
     with open(results_path / "results.json", "w") as f:
         json.dump(data, f, indent=2, sort_keys=True)
 
-    print(f"Results saved to {results_path/'results.json'}")
+    print(
+        f"Results computed in {total_time:.1f} seconds and saved to {results_path/'results.json'}"
+    )
 
     # Print summary
     print("=== HPatches Overall Results ===")
