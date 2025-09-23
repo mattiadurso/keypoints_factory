@@ -6,9 +6,8 @@ benchmarks/*/data
 sandesc_models/*
 __bin/*
 nohup.out
-benchmarks/*/results/results.json
 benchmarks/read_linear_scaling_dedode.ipynb
 benchmarks/*/intermediate/*
 benchmarks/imc/to_import_imc/*
 benchmarks/imc/*benchmark*
-benchmarks/imc/results*
+benchmarks/*/results*/
