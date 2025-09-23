@@ -17,6 +17,8 @@ Alternatively, the following packages can be manually installed:
 ```bash
 # Create conda env
 conda create -n keypoint_factory python=3.10.16
+conda activate keypoint_factory      # Or . ./activate_env.sh if you are lazy
+
 
 # Install PyTorch with CUDA 12.4 support
 pip install torch==2.6.0+cu124 torchvision==0.21.0+cu124 --index-url https://download.pytorch.org/whl/cu124
@@ -105,7 +107,7 @@ Depth is estimated using [APD-MVS](https://github.com/whoiszzj/APD-MVS). A sky m
 
 The benchmark computes the following metrics:
 - **Repeatability**  
-  Repeatability is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels.
+  It is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels.
 
 - **Number of Inliers**  
   The raw count of inlier correspondences found during pose estimation.
@@ -198,7 +200,7 @@ Despite this benchmark being heavily parallelized, it takes ~1h per method. Neve
 
 Among the metrics computed by the benchmark, the following are usually found in the literature:
 - **Repeatability**  
-  Repeatability is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels. 
+  It is defined as the ratio of the number of corresponding keypoints detected in two images to the minimum number of keypoints detected in either image of the pair. Usually reported at 3 pixels. 
 
 - **Number of Inliers**  
   The raw count of inlier correspondences found during pose estimation.
