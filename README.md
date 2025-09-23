@@ -8,14 +8,13 @@ SANDesc is supported but not released yet; thus, those parts might be commented 
 
 ### 1) Create the Environment
 
-The following packages need to be installed:
+Set up the environment as follows.
 ```bash
-# Create conda env
+# Create conda environment
 conda create -n keypoint_factory python=3.10.16
-conda activate keypoint_factory      # Or . ./activate_env.sh if you are lazy
+conda activate keypoint_factory                  # Or . ./activate_env.sh if you are lazy
 
-
-# Install PyTorch with CUDA 12.4 support
+# Install PyTorch with CUDA support, tested with CUDA 12.4
 pip install \
   torch==2.6.0+cu124 \
   --index-url https://download.pytorch.org/whl/cu124
@@ -34,7 +33,7 @@ pip install \
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
 # nvidia-ml-py: to measure VRAM usage
 # PIL: used in some visualizations, but not strictly needed for benchmarking
-# xformers: to increase speed when using transformer-based models
+# xformers: to increase speed when using transformer-based models (e.g., DeDoDe, RDD)
 pip install \
   matplotlib==3.10.1 \
   nvidia-ml-py==13.580.82 \
@@ -49,11 +48,11 @@ pip install \
   shortuuid \
   jsmin
 ```
-Other dependencies might be related to different methods (e.g., ALIKED). Downloading them with scripts in this repo should install their dependencies automatically.
+Other dependencies might be related to third party specific methods. 
 
 ### 2) Download the Wrappers and Benchmarks
 
-Edit `download_wrappers.py` to choose which method to download. An empty list means all methods listed in `download_wrappers.yaml`. Then, to download __all__ benchmark data and/or code, run the following:
+Edit `download_wrappers.py` to choose which feature extractor to download. An empty list means all methods listed in `download_wrappers.yaml`. Then, to download __all__ benchmark data and/or code, run the following:
 
 ```bash
 python download_wrappers.py && \
