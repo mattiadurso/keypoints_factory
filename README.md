@@ -26,8 +26,7 @@ pip install \
   numpy==1.26.4 \
   opencv-python==4.11.0.86 \
   pandas==2.2.3 \
-  tqdm==4.67.1 \
-  pydegensac==0.1.2
+  tqdm==4.67.1
 
 ## Suggested but optional
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
@@ -43,6 +42,7 @@ pip install \
 # To run IMC, these are also needed
 pip install \
   matplotlib==3.10.1 \
+  pydegensac \
   schema \
   scipy \
   shortuuid \
