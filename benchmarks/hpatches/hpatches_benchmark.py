@@ -12,14 +12,11 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-import gc
 import time
 import json
 import torch
 import logging
 import argparse
-import pandas as pd
-import multiprocessing as mp
 from typing import List
 from pathlib import Path
 from tqdm.auto import tqdm
@@ -33,6 +30,7 @@ from benchmarks.benchmark_utils import (
     convert_numpy_types,
 )
 from benchmarks.hpatches.hpatches_benchmark_utils import (
+    _is_nan,
     load_hpatches_in_memory,
     compute_matching_stats,
     display_hpatches_results,
@@ -217,13 +215,13 @@ class HPatchesBenchmark:
                 results[category][f"repeatability_{thr}"] = {
                     "mean": (
                         float(row["mean_repeatability"])
-                        if not pd.isna(row["mean_repeatability"])
+                        if not _is_nan(row["mean_repeatability"])
                         else float("nan")
                     ),
                     "median": (
                         float(row["median_repeatability"])
                         if "median_repeatability" in row
-                        and not pd.isna(row["median_repeatability"])
+                        and not _is_nan(row["median_repeatability"])
                         else float("nan")
                     ),
                 }
