@@ -83,9 +83,13 @@ class HPatchesBenchmark:
         for folder_name, data in tqdm(hpatches.items(), f"Extracting keypoints"):
             for img in data["imgs"]:
                 # img = wrapper.img_from_numpy(img_np)
-                output = wrapper.extract(img, max_kpts=self.max_kpts)
-                keypoints[folder_name].append(output.kpts.cpu())
-                descriptors[folder_name].append(output.des.cpu())
+                output = wrapper.extract(
+                    img.to(wrapper.device), max_kpts=self.max_kpts
+                ).cpu()
+                keypoints[folder_name].append(output.kpts)
+                descriptors[folder_name].append(output.des)
+
+                torch.cuda.empty_cache()
 
         # save keypoints and descriptors in a dict
         features_dict = {"keypoints": keypoints, "descriptors": descriptors}

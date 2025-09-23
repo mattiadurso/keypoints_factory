@@ -1,14 +1,14 @@
 from __future__ import annotations
-from dataclasses import dataclass, fields
-from pathlib import Path
-from typing import Union, Tuple, List, Any, Optional
+from dataclasses import dataclass
+from typing import Union, Tuple, List, Any, Optional, Sequence
+
+Number = Union[int, float]
 
 import cv2
 import torch
 import numpy as np
 from torch import Tensor
 
-# from torchvision import transforms
 from torch.nn import functional as F
 from abc import ABC, abstractmethod
 
@@ -48,6 +48,24 @@ class MethodOutput:
 
     def get(self, key) -> Union[Any, None]:
         return self[key] if key in self.__dict__ else None
+
+    def cpu(self):
+        """Move all tensors to CPU."""
+        return MethodOutput(
+            kpts=self.kpts.cpu() if self.kpts is not None else None,
+            kpts_scores=(
+                self.kpts_scores.cpu() if self.kpts_scores is not None else None
+            ),
+            kpts_sizes=self.kpts_sizes.cpu() if self.kpts_sizes is not None else None,
+            kpts_scales=(
+                self.kpts_scales.cpu() if self.kpts_scales is not None else None
+            ),
+            kpts_angles=(
+                self.kpts_angles.cpu() if self.kpts_angles is not None else None
+            ),
+            des=self.des.cpu() if self.des is not None else None,
+            des_vol=self.des_vol.cpu() if self.des_vol is not None else None,
+        )
 
     def mask(self, mask: Tensor):
         assert mask.dtype == torch.bool, "mask must be boolean"
@@ -257,10 +275,98 @@ class MethodWrapper(ABC):
             raise ValueError("No matcher defined for this wrapper")
         return self.matcher.match(des0, des1)
 
-    def extract_multiscale(
+    def normalize_image(
         self,
-        img: Union[Tensor, np.ndarray],
-        max_kpts: Union[float, int],
-        scales: List[float],
-    ) -> List[MethodOutput]:
-        raise NotImplementedError
+        x: torch.Tensor,
+        mean: Optional[Union[Number, Sequence[Number]]] = None,
+        std: Optional[Union[Number, Sequence[Number]]] = None,
+        gray_weights: Sequence[float] = (
+            0.2989,
+            0.5870,
+            0.1140,
+        ),  # Y = 0.299R + 0.587G + 0.114B
+    ) -> torch.Tensor:
+        """
+        If mean and std are None: convert RGB to grayscale.
+        Else: normalize using mean/std (scalar or per-channel list).
+        Preserves the input layout (HWC/CHW or NHWC/NCHW). Channel count may become 1 after grayscale.
+        Expects uint8 in [0,255] or float in [0,1].
+        """
+        if x.ndim not in (3, 4):
+            raise ValueError(
+                f"Expected 3D/4D tensor, got {x.ndim}D with shape {tuple(x.shape)}"
+            )
+
+        # --- detect and convert to NCHW ---
+        is_batched = x.ndim == 4
+        if x.ndim == 3:
+            if x.shape[0] in (1, 3, 4):  # CHW
+                x_nchw, input_was_nchw = x.unsqueeze(0), True
+            else:  # HWC
+                x_nchw, input_was_nchw = x.permute(2, 0, 1).unsqueeze(0), False
+        else:
+            if x.shape[1] in (1, 3, 4):  # NCHW
+                x_nchw, input_was_nchw = x, True
+            else:  # NHWC
+                x_nchw, input_was_nchw = x.permute(0, 3, 1, 2), False
+
+        # to float32 in [0,1]
+        if not torch.is_floating_point(x_nchw):
+            x_nchw = x_nchw.float()
+        if x_nchw.max() > 1.5:
+            x_nchw = x_nchw / 255.0
+
+        N, C, H, W = x_nchw.shape
+
+        # --- default: grayscale if no mean/std provided ---
+        if mean is None and std is None:
+            if C >= 3:
+                w = torch.tensor(
+                    gray_weights[:3], dtype=x_nchw.dtype, device=x_nchw.device
+                ).view(1, 3, 1, 1)
+                x_nchw = (x_nchw[:, :3] * w).sum(dim=1, keepdim=True)  # N×1×H×W
+            else:
+                # if already single-channel (or weird count), average channels
+                x_nchw = x_nchw.mean(dim=1, keepdim=True)
+        else:
+            if (mean is None) ^ (std is None):
+                raise ValueError(
+                    "Provide both mean and std, or neither (for grayscale)."
+                )
+
+            # prepare mean/std
+            def to_list(v):
+                return (
+                    [float(v)] if isinstance(v, (int, float)) else [float(x) for x in v]
+                )
+
+            mean_l = to_list(mean)
+            std_l = to_list(std)
+
+            # build per-channel tensors (broadcast scalars)
+            if len(mean_l) == 1:
+                mean_t = torch.full(
+                    (C,), mean_l[0], dtype=x_nchw.dtype, device=x_nchw.device
+                )
+            else:
+                if len(mean_l) != C:
+                    raise ValueError(f"mean length {len(mean_l)} != channels {C}")
+                mean_t = torch.tensor(mean_l, dtype=x_nchw.dtype, device=x_nchw.device)
+
+            if len(std_l) == 1:
+                std_t = torch.full(
+                    (C,), std_l[0], dtype=x_nchw.dtype, device=x_nchw.device
+                )
+            else:
+                if len(std_l) != C:
+                    raise ValueError(f"std length {len(std_l)} != channels {C}")
+                std_t = torch.tensor(std_l, dtype=x_nchw.dtype, device=x_nchw.device)
+
+            x_nchw = (x_nchw - mean_t.view(1, C, 1, 1)) / std_t.view(1, C, 1, 1)
+
+        # --- restore original layout ---
+        if not is_batched:
+            x_out = x_nchw.squeeze(0)
+            return x_out if input_was_nchw else x_out.permute(1, 2, 0)
+        else:
+            return x_nchw if input_was_nchw else x_nchw.permute(0, 2, 3, 1)

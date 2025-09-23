@@ -31,7 +31,7 @@ def load_hpatches_in_memory(wrapper, root: str | Path, max_workers: int = 16) ->
     def _load_one(scene: Path):
         imgs, homs = [], []
         for j in range(1, 7):
-            img = wrapper.load_image(scene / f"{j}.ppm")
+            img = wrapper.load_image(scene / f"{j}.ppm").cpu()
             H = (
                 np.eye(3, dtype=np.float64)
                 if j == 1

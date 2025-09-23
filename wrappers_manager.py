@@ -66,6 +66,13 @@ def wrappers_manager(name, device="cpu"):
 
         wrapper = SIFTPyColmapWrapper(device=device)
         wrapper.name = name
+
+    elif name == "rdd":
+        from wrappers.rdd_wrapper import RDDWrapper
+
+        wrapper = RDDWrapper(device=device)
+        wrapper.name = name
+
     else:
         raise ValueError("Wrappers supported: {}".format(get_wrappers_list()))
 

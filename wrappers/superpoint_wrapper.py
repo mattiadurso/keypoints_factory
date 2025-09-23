@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import torch
-from torchvision import transforms
 
 sys.path.append("methods/superpoint")
 
@@ -20,8 +19,6 @@ class SuperPointWrapper(MethodWrapper):
         self.superpoint = SuperPoint(config).to(device)
         self.superpoint.requires_grad_(False)
 
-        self.toGray = transforms.Grayscale()
-
     @torch.inference_mode()
     def _extract(
         self, img: torch.Tensor, max_kpts: float | int, custom_kpts=None
@@ -38,7 +35,7 @@ class SuperPointWrapper(MethodWrapper):
             )
 
         with torch.amp.autocast(self.device, enabled=False):
-            output = self.superpoint({"image": self.toGray(img)[None]})
+            output = self.superpoint({"image": self.normalize_image(img)[None]})
 
             kpts = output["keypoints"][0]
             kpts_scores = output["scores"][0]
