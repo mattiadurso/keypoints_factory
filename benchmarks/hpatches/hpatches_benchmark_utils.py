@@ -212,14 +212,7 @@ def compute_homography_corner_error(
     # ? compute the corner error in the projected frame
     projected_corners0_GT = warp_points(corners0, H0_1_GT.to(torch.double))  # B,4,2
     projected_corners0 = warp_points(corners0, H0_1_estimated.to(torch.double))  # B,4,2
-    corner_error = torch.norm(projected_corners0_GT - projected_corners0, dim=2).mean(
-        1
-    )  # B
-    # # ? compute the corner error in the img0 frame
-    # projected_corners0_GT = warp_points(corners0, H0_1_GT.to(torch.double))  # B,4,2
-    # unprojected_corners0 = warp_points(projected_corners0_GT, torch.inverse(H0_1_estimated.to(torch.double)))  # B,4,2
-    # corner_error = torch.norm(corners0 - unprojected_corners0, dim=2).mean(1)  # B
-
+    corner_error = torch.norm(projected_corners0_GT - projected_corners0, dim=2).mean(1)
     if img1_shape is not None:
         corners1 = torch.tensor(
             [
@@ -241,18 +234,8 @@ def compute_homography_corner_error(
         )  # B,4,2
         corner_error_1 = torch.norm(
             projected_corners1_GT - projected_corners1, dim=2
-        ).mean(
-            1
-        )  # B
-        # # ? compute the corner error in the img1 frame
-        # projected_corners1_GT = warp_points(corners1, torch.inverse(H0_1_GT.to(torch.double)))  # B,4,2
-        # unprojected_corners1 = warp_points(projected_corners1_GT, H0_1_estimated.to(torch.double))  # B,4,2
-        # corner_error_1 = torch.norm(corners1 - unprojected_corners1, dim=2).mean(1)  # B
-
+        ).mean(1)
         corner_error = 0.5 * (corner_error + corner_error_1)  # B
-
-    # # ? remove all the values smaller than a threshold
-    # corner_error = torch.div(corner_error, 1e-3, rounding_mode='floor') * 1e-3
 
     return corner_error
 
@@ -361,7 +344,7 @@ def compute_corner_error(
 
 def find_distance_matrices_between_points_and_their_projections(
     xy0: Tensor, xy1: Tensor, xy0_proj: Tensor, xy1_proj: Tensor
-) -> (Tensor, Tensor):
+) -> Tuple[Tensor, Tensor]:
     """find the mutual nearest neighbors between two sets of keypoints and their projections
     Args:
         xy0: first set of keypoints
@@ -410,7 +393,7 @@ def compute_coverages(
     img1_shape: Tensor,
     px_thrs: float | list[float],
     coverage_kernel_size: int,
-) -> tuple[float, float] | tuple[Tensor, Tensor]:
+) -> Tuple[float, float] | Tuple[Tensor, Tensor]:
     assert (
         xy0.ndim == 2 and xy1.ndim == 2
     ), f"xy0 and xy1 must be 2D tensors, got {xy0.shape} and {xy1.shape}"
@@ -572,8 +555,8 @@ def compute_matching_stats_homography(
     m0 = _inside(img1_shape, xy0_w)
     m1 = _inside(img0_shape, xy1_w)
 
-    xy0_vis = xy0[m0]
-    xy1_vis = xy1[m1]
+    # xy0_vis = xy0[m0]
+    # xy1_vis = xy1[m1]
     xy0_w_vis = xy0_w[m0]
     xy1_w_vis = xy1_w[m1]
 
