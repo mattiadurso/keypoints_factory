@@ -119,25 +119,6 @@ python benchmarks/benchmark_parallel.py --benchmark-name ghr # For a single test
 python benchmarks/graz_high_res/run.py                       # For battery tests
 ```
 
-Here below we report the benchmark results. We include results with SANDesc.
-
-#### Results with a Budget of 2048 Keypoints
-
-| Method        | AUC@5 (FHD) | AUC@5 (QHD) | AUC@5 (4K) | AUC@10 (FHD) | AUC@10 (QHD) | AUC@10 (4K) |
-|---------------|-------------|-------------|------------|--------------|--------------|-------------|
-| SuperPoint    | 40.3        | 38.9        | 32.3       | 54.9         | 52.5         | 44.3        |
-| ↳w/SANDesc  | **62.5**    | **61.7**    | **57.3**   | **74.7**     | **73.8**     | **69.5**    |
-| DISK          | 40.2        | 37.9        | 32.8       | 52.8         | 49.7         | 44.3        |
-| ↳w/SANDesc  | **55.3**    | **54.5**    | **48.8**   | **68.9**     | **67.1**     | **61.2**    |
-| RIPE          | 54.8        | 47.5        | 33.3       | 67.2         | 59.9         | 44.7        |
-| ↳w/SANDesc  | **63.3**    | **63.2**    | **56.9**   | **75.0**     | **74.7**     | **68.5**    |
-| ALIKED        | 54.7        | 51.9        | 43.6       | 67.5         | 65.0         | 57.2        |
-| ↳w/SANDesc  | **64.4**    | **64.4**    | **61.4**   | **75.8**     | **75.6**     | **73.0**    |
-| DeDoDe-B      | 57.1        | OOM         | OOM        | 70.3         | OOM          | OOM         |
-| DeDoDe-G      | 57.3        | OOM         | OOM        | 70.8         | OOM          | OOM         |
-| ↳w/SANDesc  | **57.4**    | **56.0**    | **52.0**   | **70.7**     | **69.1**     | **65.3**    |
-------
-
 ### MegaDepth-1500
 [MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500) is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We assign a score of 180 degrees (the worst score) when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, we suggest evaluating methods at keypoint budgets of 2K and 30K. On an RTX 4090 and using 16 cores, SuperPoint completes the benchmark in less than a minute.
 
