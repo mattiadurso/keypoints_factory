@@ -10,16 +10,21 @@ class DiskWrapperKornia(MethodWrapper):
     def __init__(self, device: str = "cuda:0", border=16) -> None:
         super().__init__(name="disk", border=border, device=device)
 
-        self.disk = KF.DISK.from_pretrained("depth").to(device)
+        self.model = KF.DISK.from_pretrained("depth").to(device)
+
+        # params no grad
+        for p in self.model.parameters():
+            p.requires_grad = False
 
     @torch.inference_mode()
     def _extract(
         self, img: torch.Tensor, max_kpts: int, custom_kpts=None
     ) -> MethodOutput:
+
         with torch.amp.autocast(
             device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp
         ):
-            out = self.disk(img[None], max_kpts)[0]
+            out = self.model(img[None], max_kpts)[0]
             kpts, des = out.keypoints, out.descriptors
 
             if self.custom_descriptor is not None:
@@ -45,7 +50,7 @@ try:
             )
             disk.load_state_dict(state_dict["extractor"])
 
-            self.disk = disk.to(device)
+            self.model = disk.to(device)
 
         @torch.inference_mode()
         def _extract(
@@ -59,7 +64,7 @@ try:
                         "Custom keypoints not implemented for DISK."
                     )
                 # desc_vol is None if use_disk_descriptors is False
-                features = self.disk.features(
+                features = self.model.features(
                     img[None], kind="nms", window_size=5, cutoff=0, n=max_kpts
                 )
                 kpts, kpts_scores = features[0].kp, features[0].kp_logp

@@ -46,7 +46,7 @@ class RDDWrapper(MethodWrapper):
             for p in RDD_model.parameters():
                 p.requires_grad = False
 
-            self.RDD = RDD_model.to(device)
+            self.model = RDD_model.to(device)
 
         except Exception as e:
             raise RuntimeError(f"Failed to initialize RDD model: {e}")
@@ -62,7 +62,7 @@ class RDDWrapper(MethodWrapper):
         with torch.amp.autocast(
             device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp
         ):
-            out = self.RDD.extract(x)[0]
+            out = self.model.extract(x)[0]
             kpts, scores, des = (
                 out["keypoints"],
                 out["scores"],

@@ -47,8 +47,12 @@ class DeDoDeWrapper(MethodWrapper):
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
 
-    def add_custom_descriptor(self, model):
+    def add_custom_descriptor(self, model, grad: bool = False):
         self.custom_descriptor = model
+        if not grad:
+            for p in self.custom_descriptor.parameters():
+                p.requires_grad = grad
+        self.custom_descriptor.to(self.device)
         # clean up
         self.descriptor = None
         self.descriptor_G = False
@@ -91,3 +95,13 @@ class DeDoDeWrapper(MethodWrapper):
                 ].permute(1, 2, 0)[0]
 
         return MethodOutput(kpts=kpts_pix[0], kpts_scores=scores[0], des=des)
+
+    def move_to(self, device="cpu"):
+        """Move the model to the specified device."""
+        self.device = device
+        self.detector.to(device)
+        if self.custom_descriptor is not None:
+            self.custom_descriptor.to(device)
+        else:
+            self.descriptor.to(device)
+        return self

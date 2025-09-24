@@ -145,9 +145,13 @@ class MethodWrapper(ABC):
         else:
             raise TypeError("Unsupported image type")
 
-    def add_custom_descriptor(self, model):
+    def add_custom_descriptor(self, model, grad: bool = False):
         # can be whatever model that takes (B, C, H, W) as input and returns (B, D, H, W)
         self.custom_descriptor = model
+        if not grad:
+            for p in self.custom_descriptor.parameters():
+                p.requires_grad = grad
+        self.custom_descriptor.to(self.device)
 
     def to_pixel_coords(self, flow, h1, w1):
         w_ = w1 * (flow[..., 0] + 1) / 2
@@ -370,3 +374,11 @@ class MethodWrapper(ABC):
             return x_out if input_was_nchw else x_out.permute(1, 2, 0)
         else:
             return x_nchw if input_was_nchw else x_nchw.permute(0, 2, 3, 1)
+
+    def move_to(self, device="cpu"):
+        """Move the model to the specified device."""
+        self.device = device
+        self.model.to(device)
+        if self.custom_descriptor is not None:
+            self.custom_descriptor.to(device)
+        return self

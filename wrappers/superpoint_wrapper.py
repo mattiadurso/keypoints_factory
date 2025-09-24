@@ -16,15 +16,15 @@ class SuperPointWrapper(MethodWrapper):
             "keypoint_threshold": -1,  # min score, -1 to disable
             "max_keypoints": 2048,
         }
-        self.superpoint = SuperPoint(config).to(device)
-        self.superpoint.requires_grad_(False)
+        self.model = SuperPoint(config).to(device)
+        self.model.requires_grad_(False)
 
     @torch.inference_mode()
     def _extract(
         self, img: torch.Tensor, max_kpts: float | int, custom_kpts=None
     ) -> MethodOutput:
-        if max_kpts != self.superpoint.config["max_keypoints"]:
-            self.superpoint.config["max_keypoints"] = max_kpts
+        if max_kpts != self.model.config["max_keypoints"]:
+            self.model.config["max_keypoints"] = max_kpts
             print(f"Updated max_keypoints to {max_kpts}.")
 
         assert img.ndim == 3, "image must be not batched"
@@ -35,7 +35,7 @@ class SuperPointWrapper(MethodWrapper):
             )
 
         with torch.amp.autocast(self.device, enabled=False):
-            output = self.superpoint({"image": self.normalize_image(img)[None]})
+            output = self.model({"image": self.normalize_image(img)[None]})
 
             kpts = output["keypoints"][0]
             kpts_scores = output["scores"][0]
