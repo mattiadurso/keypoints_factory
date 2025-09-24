@@ -390,7 +390,12 @@ class Benchmark:
         if current_batch:  # Add remaining pairs
             batch_data.append(current_batch)
 
+        # Generate seeds for each worker to ensure reproducibility
+        base_seed = self.seed
+        worker_seeds = [base_seed + i for i in range(len(batch_data))]
+
         # Ensure no GPU usage in parallel jobs
+        _prev = os.environ.get("CUDA_VISIBLE_DEVICES")  # e.g. "0,1" or None
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
         # Process batches in parallel with proper seeding
@@ -398,14 +403,16 @@ class Benchmark:
             process_pose_estimation_batch, th=self.ransac_th
         )
 
-        # Generate seeds for each worker to ensure reproducibility
-        base_seed = self.seed
-        worker_seeds = [base_seed + i for i in range(len(batch_data))]
-
         batch_results = Parallel(n_jobs=self.njobs, verbose=1)(
             delayed(pose_estimation_partial)(batch, worker_seed=seed)
             for batch, seed in zip(batch_data, worker_seeds)
         )
+
+        # Revert GPU settings
+        if _prev is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)  # removes the var
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = _prev
 
         # Flatten results
         results = []
