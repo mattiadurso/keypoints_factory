@@ -13,7 +13,7 @@ class AlikedWrapper(MethodWrapper):
         super().__init__(name="aliked", border=border, device=device)
         self.max_kpts = max_kpts
 
-        self.aliked = (
+        self.model = (
             ALIKED(
                 model_name="aliked-n16rot",
                 device=device,
@@ -47,7 +47,7 @@ class AlikedWrapper(MethodWrapper):
             device_type="cuda", dtype=self.amp_dtype, enabled=self.use_amp
         ):
             if self.custom_descriptor is None:  # no custom descriptor
-                out = self.aliked(x)
+                out = self.model(x)
                 kpts, scores, des = (
                     out["keypoints"][0],
                     out["scores"][0],
@@ -57,8 +57,8 @@ class AlikedWrapper(MethodWrapper):
 
             else:  # use custom descriptor
                 if custom_kpts is None:  # no custom kpts given, extract them
-                    _, score_map = self.aliked.extract_dense_map(x)
-                    kpts, scores, _ = self.aliked.dkd(score_map)
+                    _, score_map = self.model.extract_dense_map(x)
+                    kpts, scores, _ = self.model.dkd(score_map)
                     kpts, scores = kpts[0], scores[0]
                     kpts = self.to_pixel_coords(kpts, x.shape[-2], x.shape[-1])
                 else:  # use the given custom kpts
