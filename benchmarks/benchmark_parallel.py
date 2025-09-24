@@ -48,7 +48,7 @@ class Benchmark:
     def __init__(
         self,
         benchmark_name: str,
-        dataset_path: str,
+        dataset_path=abs_root / "benchmarks/megadepth1500/data",
         ransac_th: float = 1,
         min_score: float = 0.5,
         ratio_test: float = 1,
@@ -60,6 +60,7 @@ class Benchmark:
         keypoints_path: str = None,
         descriptors_path: str = None,
         compute_repeatability: bool = False,
+        device: str = "cuda",
         px_thrs: list = [1, 3, 5],
     ):
         self.benchmark_name = benchmark_name
@@ -88,6 +89,7 @@ class Benchmark:
             ]
             and scaling_factor == 1
         )  # repeatability only for MegaDepth and GHR
+        self.device = device
         self.px_thrs = px_thrs
 
         s = " with repeatability computation" if self.compute_repeatability else ""
@@ -103,23 +105,23 @@ class Benchmark:
             self.pairs_calibrated = [p for p in self.pairs_calibrated if scene in p]
             logger.info(f"Using only pairs from {scene} for GHR partial benchmark.")
 
-        if dataset_name.lower() == "megadepth1500":
+        if benchmark_name.lower() == "megadepth1500":
             self.images_path = self.dataset_path / "images"
             self.depths_path = self.dataset_path / "depths"
             self.views_path = self.dataset_path / "views.txt"
             self.views_dict = parse_poses(self.views_path, self.benchmark_name)
 
-        elif dataset_name.lower() == "scannet1500":
+        elif benchmark_name.lower() == "scannet1500":
             self.images_path = self.dataset_path
 
-        elif dataset_name.lower() == "graz_high_res":
+        elif benchmark_name.lower() == "graz_high_res":
             self.images_path = self.dataset_path
             self.depths_path = self.dataset_path
             self.views_path = self.dataset_path / "views.txt"
             self.views_dict = parse_poses(self.views_path, self.benchmark_name)
 
         else:
-            raise ValueError(f"Unknown dataset name: {dataset_name}")
+            raise ValueError(f"Unknown dataset name: {benchmark_name}")
 
         # Matcher params
         self.matcher_params = {"min_score": min_score, "ratio_test": ratio_test}
@@ -169,8 +171,8 @@ class Benchmark:
                 with torch.no_grad():
                     out = wrapper.extract(img, self.max_kpts)
 
-                keypoints_dict[img_name] = {"kpts": out.kpts.cpu()}
-                descriptors_dict[img_name] = out.des.cpu()
+                keypoints_dict[img_name] = {"kpts": out.kpts.detach().cpu()}
+                descriptors_dict[img_name] = out.des.detach().cpu()
 
                 if self.compute_repeatability:
                     # load depth
@@ -195,7 +197,7 @@ class Benchmark:
                     Z_sampled, _ = wrapper.grid_sample_nan(
                         out.kpts[None], Z[None], mode="nearest"
                     )
-                    keypoints_dict[img_name]["depth"] = Z_sampled[0]
+                    keypoints_dict[img_name]["depth"] = Z_sampled[0].detach()
 
             except Exception as e:
                 logger.info(f"Error processing {img_name}: {e}")
@@ -226,7 +228,7 @@ class Benchmark:
         logger.info(f"Features saved: {keypoints_file} and {descriptors_file}")
         return keypoints_file, descriptors_file
 
-    def batch_match_all_pairs(self, wrapper, device="cuda", save_key=None):
+    def batch_match_all_pairs(self, wrapper, save_key=None):
         """Match all pairs in batch mode."""
 
         # Get features (either precomputed or extract with wrapper)
@@ -262,8 +264,8 @@ class Benchmark:
             # Get features
             kpts1 = keypoints_dict[img1]["kpts"]
             kpts2 = keypoints_dict[img2]["kpts"]
-            desc1 = descriptors_dict[img1].to(device)
-            desc2 = descriptors_dict[img2].to(device)
+            desc1 = descriptors_dict[img1].to(self.device)
+            desc2 = descriptors_dict[img2].to(self.device)
 
             # Scale intrinsics if scaling applied
             if self.scaling_factor != 1:
@@ -285,7 +287,7 @@ class Benchmark:
             }
 
         # free memory, this stuff is no longer needed
-        del desc1, desc2, matches
+        del desc1, desc2, matches, matcher
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -314,14 +316,14 @@ class Benchmark:
                 img2_size = self.views_dict[img2]["image_size"]
 
                 rep = compute_repeatabilities_from_kpts(
-                    kpts1[None].float().to(device),
-                    kpts2[None].float().to(device),
-                    K1[None].float().to(device),
-                    K2[None].float().to(device),
-                    Z1[None].float().to(device),
-                    Z2[None].float().to(device),
-                    P1[None].float().to(device),
-                    P2[None].float().to(device),
+                    kpts1[None].float().to(self.device),
+                    kpts2[None].float().to(self.device),
+                    K1[None].float().to(self.device),
+                    K2[None].float().to(self.device),
+                    Z1[None].float().to(self.device),
+                    Z2[None].float().to(self.device),
+                    P1[None].float().to(self.device),
+                    P2[None].float().to(self.device),
                     img1_shape=img1_size,
                     img2_shape=img2_size,
                     px_thrs=self.px_thrs,
@@ -388,6 +390,9 @@ class Benchmark:
         if current_batch:  # Add remaining pairs
             batch_data.append(current_batch)
 
+        # Ensure no GPU usage in parallel jobs
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
         # Process batches in parallel with proper seeding
         pose_estimation_partial = partial(
             process_pose_estimation_batch, th=self.ransac_th
@@ -410,7 +415,7 @@ class Benchmark:
         return results
 
     @torch.no_grad()
-    def benchmark(self, wrapper, device="cuda", save_key=None):
+    def benchmark(self, wrapper, save_key=None):
         """Run the complete benchmark."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -423,9 +428,13 @@ class Benchmark:
             features_save_key = f"{save_key}_{timestamp}"
 
         # Phase 1: Batch matching (with feature extraction if needed)
+        wrapper.move_to(self.device)  # ensure wrapper is on the correct device
+
         matches_dict, rep_results = self.batch_match_all_pairs(
-            wrapper, device, save_key=features_save_key
-        )  # from here there is still something on GPU that need to be freed, but it shouldn't be a problem
+            wrapper, save_key=features_save_key
+        )
+
+        wrapper.move_to("cpu")  # to avoid issues in parallel jobs
 
         # Force loky backend for better isolation and reproducibility
         with parallel_backend("loky", n_jobs=self.njobs):
@@ -438,19 +447,19 @@ class Benchmark:
 
         thresholds = [5, 10, 20]
         auc = pose_auc(tot_e_pose, thresholds)
-        acc_5 = (tot_e_pose < 5).mean()
-        acc_10 = (tot_e_pose < 10).mean()
-        acc_15 = (tot_e_pose < 15).mean()
-        acc_20 = (tot_e_pose < 20).mean()
+        # acc_5 = (tot_e_pose < 5).mean()
+        # acc_10 = (tot_e_pose < 10).mean()
+        # acc_15 = (tot_e_pose < 15).mean()
+        # acc_20 = (tot_e_pose < 20).mean()
 
         out = {
             "inlier": np.mean(inliers),
             "auc_5": auc[0],
             "auc_10": auc[1],
             "auc_20": auc[2],
-            "map_5": acc_5,
-            "map_10": np.mean([acc_5, acc_10]),
-            "map_20": np.mean([acc_5, acc_10, acc_15, acc_20]),
+            # "map_5": acc_5,
+            # "map_10": np.mean([acc_5, acc_10]),
+            # "map_20": np.mean([acc_5, acc_10, acc_15, acc_20]),
         }
 
         if self.compute_repeatability:
@@ -539,21 +548,21 @@ if __name__ == "__main__":
 
     device = args.device
     wrapper_name = args.wrapper_name
-    dataset_name = args.ds
+    benchmark_name = args.ds
 
-    if dataset_name.lower() in ["md", "md1500", "megadepth1500"]:
-        dataset_name = "megadepth1500"
-    elif dataset_name.lower() in ["sc", "scannet", "sc1500", "scannet1500"]:
-        dataset_name = "scannet1500"
-    elif dataset_name.lower() in ["graz", "ghr", "graz_high_res"]:
-        dataset_name = "graz_high_res"
+    if benchmark_name.lower() in ["md", "md1500", "megadepth1500"]:
+        benchmark_name = "megadepth1500"
+    elif benchmark_name.lower() in ["sc", "scannet", "sc1500", "scannet1500"]:
+        benchmark_name = "scannet1500"
+    elif benchmark_name.lower() in ["graz", "ghr", "graz_high_res"]:
+        benchmark_name = "graz_high_res"
     else:
-        raise ValueError(f"Unknown dataset name: {dataset_name}")
+        raise ValueError(f"Unknown dataset name: {benchmark_name}")
 
     data_path = (
         args.data_path
         if args.data_path is not None
-        else f"benchmarks/{dataset_name}/data"
+        else f"benchmarks/{benchmark_name}/data"
     )
     njobs = args.njobs
     ratio_test = args.ratio_test
@@ -589,7 +598,7 @@ if __name__ == "__main__":
 
         from sandesc_models.sandesc.network_descriptor import SANDesc
 
-        network = SANDesc(**model).eval().to(device)
+        network = SANDesc(**model).eval()
 
         weights = torch.load(custom_desc, weights_only=False)
         network.load_state_dict(weights["state_dict"])
@@ -600,7 +609,7 @@ if __name__ == "__main__":
 
     # matcher params
 
-    if dataset_name == "graz_high_res" and ghr_partial:
+    if benchmark_name == "graz_high_res" and ghr_partial:
         key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn_scale_{scaling_factor}_partial {max_kpts}"
     else:
         key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn_scale_{scaling_factor} {max_kpts}"
@@ -612,7 +621,7 @@ if __name__ == "__main__":
     logger.info(f"\n>>> Running parallel benchmark for {key}...<<<\n")
 
     # create if not exists
-    results_path = Path(f"benchmarks/{dataset_name}/results")
+    results_path = Path(f"benchmarks/{benchmark_name}/results")
     os.makedirs(results_path, exist_ok=True)
 
     if not os.path.exists(results_path / "results.json"):
@@ -630,7 +639,7 @@ if __name__ == "__main__":
 
     # Define the benchmark
     benchmark = Benchmark(
-        benchmark_name=dataset_name,
+        benchmark_name=benchmark_name,
         dataset_path=data_path,
         ransac_th=ransac_th,
         min_score=min_score,
@@ -643,15 +652,14 @@ if __name__ == "__main__":
         keypoints_path=keypoints_path,
         descriptors_path=descriptors_path,
         compute_repeatability=compute_repeatability,
+        device=device,
     )
 
     # Run the benchmark
     s = time.time()
     # Create a simpler save key for features (wrapper_name + max_kpts)
     feature_save_key = f"{wrapper_name}_kpts_{max_kpts}"
-    results, timestamp = benchmark.benchmark(
-        wrapper, args.device, save_key=feature_save_key
-    )
+    results, timestamp = benchmark.benchmark(wrapper, save_key=feature_save_key)
     print_metrics(wrapper, results)
     print("-------------------------------------------------------------")
 

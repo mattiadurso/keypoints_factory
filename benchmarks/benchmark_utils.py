@@ -7,6 +7,8 @@ import argparse
 import numpy as np
 import torch.nn.functional as F
 
+from typing import List, Dict, Iterable, Optional, Mapping
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -306,3 +308,127 @@ def compute_relative_pose(R1, t1, R2, t2):
     rots = R2 @ (R1.T)
     trans = -rots @ t1 + t2
     return rots, trans
+
+
+def print_table(
+    rows: List[Dict[str, object]],
+    *,
+    columns: Optional[Iterable[str]] = None,
+    left_align: Optional[Iterable[str]] = None,
+    right_align: Optional[Iterable[str]] = None,
+    min_widths: Optional[Mapping[str, int]] = None,
+    float_format: str = ".3f",
+    fill_missing: str = "",
+    clip_widths: Optional[Mapping[str, int]] = None,
+    header: bool = True,
+    sep: str = " | ",
+) -> None:
+    """
+    Pretty-print a table from a list of dicts (assumes all dicts share the same keys).
+
+    Args:
+        rows: List of row dicts.
+        columns: Optional explicit column order. Defaults to keys() of the first row.
+        left_align: Columns to force left-align (others may be auto-detected).
+        right_align: Columns to force right-align.
+        min_widths: Dict of minimum widths per column (e.g., {"Method": 18, "Desc": 12}).
+        float_format: Format spec for floats (e.g., ".2f" → 2 decimals).
+        fill_missing: String to use when a key is missing in a row.
+        clip_widths: Dict of maximum widths; values longer than the limit are clipped with “…” .
+        header: Whether to print a header row and separator.
+        sep: Column separator string.
+    """
+    if not rows:
+        print("(empty)")
+        return
+
+    # Column order
+    cols = list(columns) if columns is not None else list(rows[0].keys())
+
+    # Alignment sets
+    left_align = set(left_align or ())
+    right_align = set(right_align or ())
+
+    # Detect numeric columns if not explicitly aligned
+    def is_numeric_value(v: object) -> bool:
+        if isinstance(v, (int, float)):
+            return True
+        # Accept numeric-looking strings, ignore empty/missing
+        if isinstance(v, str) and v.strip():
+            try:
+                float(v)
+                return True
+            except ValueError:
+                return False
+        return False
+
+    numeric_cols = set()
+    for c in cols:
+        # If user forced alignment, skip auto-detect for that col
+        if c in left_align or c in right_align:
+            continue
+        # Numeric if every non-empty value parses as number
+        is_numeric = True
+        for r in rows:
+            v = r.get(c, fill_missing)
+            if v == fill_missing or v is None or (isinstance(v, str) and v == ""):
+                continue
+            if not is_numeric_value(v):
+                is_numeric = False
+                break
+        if is_numeric:
+            numeric_cols.add(c)
+
+    # Widths
+    min_widths = dict(min_widths or {})
+    widths = {c: max(len(str(c)), min_widths.get(c, 0)) for c in cols}
+
+    def format_cell(v: object, col: str) -> str:
+        # Numeric formatting
+        if isinstance(v, float):
+            return format(v, float_format)
+        # Numeric-looking strings: leave as-is (assumed already formatted)
+        return str(v)
+
+    # Compute widths from data
+    for r in rows:
+        for c in cols:
+            v = r.get(c, fill_missing)
+            s = format_cell(v, c)
+            widths[c] = max(widths[c], len(s))
+
+    # Apply clipping limits
+    clip_widths = dict(clip_widths or {})
+
+    def clip(s: str, w: int, maxw: Optional[int]) -> str:
+        if maxw is None or maxw <= 0 or len(s) <= maxw:
+            return s
+        # keep room for ellipsis
+        return s[: max(0, maxw - 1)] + "…"
+
+    # Render header
+    def align_text(s: str, col: str) -> str:
+        # Priority: explicit align → auto numeric → default left
+        if col in right_align:
+            return s.rjust(widths[col])
+        if col in left_align or col not in numeric_cols:
+            return s.ljust(widths[col])
+        return s.rjust(widths[col])
+
+    if header:
+        hdr = sep.join(
+            align_text(clip(str(c), widths[c], clip_widths.get(c)), c) for c in cols
+        )
+        bar = sep.join("-" * widths[c] for c in cols)
+        print(hdr)
+        print(bar)
+
+    # Render rows
+    for r in rows:
+        cells = []
+        for c in cols:
+            raw = r.get(c, fill_missing)
+            s = format_cell(raw, c)
+            s = clip(s, widths[c], clip_widths.get(c))
+            cells.append(align_text(s, c))
+        print(sep.join(cells))
