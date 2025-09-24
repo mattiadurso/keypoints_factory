@@ -1,3 +1,4 @@
+import os
 import cv2
 import math
 import json
@@ -336,6 +337,7 @@ def compute_corner_error(
         }
 
     # Parallel across thresholds
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
     results = Parallel(n_jobs=njobs, prefer="threads")(
         delayed(_solve_one)(thr) for thr in ransac_homography_threshold
     )
@@ -786,6 +788,7 @@ def compute_matching_stats(
         return sdf, hdf
 
     # Using threads is faster here since each job is lightweight
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
     results = Parallel(n_jobs=njobs, prefer="threads")(
         delayed(_compute_one_pair)(folder, j)
         for (folder, j) in tqdm(work, desc="Computing pairs")
