@@ -3,7 +3,6 @@ from copy import deepcopy
 from typing import Union
 
 import torch
-import kornia
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Union
@@ -135,14 +134,29 @@ def compute_essential_from_relative_motion(R, t):
     R = to_torch(R)
     t = to_torch(t, b=False)
 
-    if R.shape[-1] == 4:
-        # its a quaternion
-        R = kornia.geometry.conversions.quaternion_to_rotation_matrix(R)
-
-    Tx = kornia.geometry.conversions.vector_to_skew_symmetric_matrix(t)
+    Tx = vector_to_skew_symmetric_matrix(t)
     Em = Tx @ R
 
     return Em
+
+
+def vector_to_skew_symmetric_matrix(t):
+    """
+    Convert a 3D vector to its skew-symmetric matrix.
+    Args:
+        t: torch.Tensor of shape (3,) or (1, 3)
+    Returns:
+        Tx: torch.Tensor of shape (3, 3)
+    """
+    t = t.flatten()
+    Tx = torch.zeros(3, 3, dtype=t.dtype, device=t.device)
+    Tx[0, 1] = -t[2]
+    Tx[0, 2] = t[1]
+    Tx[1, 0] = t[2]
+    Tx[1, 2] = -t[0]
+    Tx[2, 0] = -t[1]
+    Tx[2, 1] = t[0]
+    return Tx
 
 
 def plot_imgs(images, titles=None, rows=1):

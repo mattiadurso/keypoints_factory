@@ -22,18 +22,19 @@ pip install \
 pip install \
   h5py==3.13.0 \
   joblib==1.4.2 \
-  kornia==0.8.0 \
   numpy==1.26.4 \
   opencv-python==4.11.0.86 \
   pandas==2.2.3 \
   tqdm==4.67.1
 
 ## Suggested but optional
+# kornia: need for "disk-kornia" method. If not installed you need to provide/download at least one method in methods/ to run benchmarks
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
 # nvidia-ml-py: to measure VRAM usage
 # PIL: used in some visualizations, but not strictly needed for benchmarking
 # xformers: to increase speed when using transformer-based models (e.g., DeDoDe, RDD)
 pip install \
+  kornia==0.8.0 \
   matplotlib==3.10.1 \
   nvidia-ml-py==13.580.82 \
   Pillow==11.1.0 \
