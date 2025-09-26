@@ -14,18 +14,29 @@ import glob
 import json
 import time
 import torch
-
-try:
-    import pynvml
-except ImportError:
-    pynvml = None
 import logging
 import numpy as np
-from tqdm import tqdm
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logger.info(
+        "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
+    )
+    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+
+try:
+    import pynvml
+except ImportError:
+    logger.info(
+        "pynvml is not available, VRAM usage will not be logged. You can install it with pip install nvidia-ml-py"
+    )
+    pynvml = None
 
 
 def get_vram_usage(gpu_index=0):

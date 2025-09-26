@@ -14,6 +14,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def fake_tqdm(x, **kwargs):
+    return x
+
+
 def parse_poses(poses_file, benchmark_name):
     """Parse poses from a given file based on the benchmark format."""
     if benchmark_name in ["megadepth1500", "graz_high_res"]:

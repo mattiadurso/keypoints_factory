@@ -20,8 +20,6 @@ import torch
 import logging
 import argparse
 import numpy as np
-
-from tqdm.auto import tqdm
 from datetime import datetime
 from functools import partial
 from joblib import Parallel, delayed, parallel_backend
@@ -42,6 +40,14 @@ from benchmarks.repeatability_utils import compute_repeatabilities_from_kpts
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logger.info(
+        "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
+    )
+    from benchmarks.benchmark_utils import fake_tqdm as tqdm
 
 
 class Benchmark:
@@ -448,6 +454,8 @@ class Benchmark:
             # Phase 2: Parallel pose estimation
             results = self.batch_pose_estimation(matches_dict)
 
+        wrapper.move_to(self.device)  # move back to original device
+
         # Compute metrics
         tot_e_pose = np.array([r[4] for r in results])
         inliers = np.array([r[5] for r in results])
@@ -615,7 +623,6 @@ if __name__ == "__main__":
         logger.info(f"Using custom descriptors from {custom_desc}.")
 
     # matcher params
-
     if benchmark_name == "graz_high_res" and ghr_partial:
         key = f"{wrapper.name} min_score_{min_score}_ratio_test_{ratio_test}_th_{ransac_th}_mnn_scale_{scaling_factor}_partial {max_kpts}"
     else:

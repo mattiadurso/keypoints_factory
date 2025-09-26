@@ -19,7 +19,6 @@ import logging
 import argparse
 from typing import List
 from pathlib import Path
-from tqdm.auto import tqdm
 from datetime import datetime
 
 
@@ -39,6 +38,14 @@ from benchmarks.hpatches.hpatches_benchmark_utils import (
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logger.info(
+        "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
+    )
+    from benchmarks.benchmark_utils import fake_tqdm as tqdm
 
 
 class HPatchesBenchmark:
