@@ -8,13 +8,13 @@ SANDesc is supported but not released yet; thus, those parts might be commented 
 
 ### 1) Create the Environment
 
-Set up the environment as follows.
+Set up the environment as follows. Other library versions might work as well, I tested the code with these.
 ```bash
 # Create conda environment
 conda create -n keypoint_factory python=3.10.16
 conda activate keypoint_factory                  # Or . ./activate_env.sh if you are lazy
 
-# Install PyTorch with CUDA support, tested with CUDA 12.4
+# Install PyTorch with CUDA support (tested with CUDA 12.4)
 pip install \
   torch==2.6.0+cu124 \
   --index-url https://download.pytorch.org/whl/cu124
@@ -24,30 +24,36 @@ pip install \
   joblib==1.4.2 \
   numpy==1.26.4 \
   opencv-python==4.11.0.86 \
-  pandas==2.2.3 \
-  tqdm==4.67.1
+  pandas==2.2.3 
+  
 
-## Suggested but optional
-# kornia: need for "disk-kornia" method. If not installed you need to provide/download at least one method in methods/ to run benchmarks
+## Suggested but optional. 
+# kornia: need for "disk-kornia" method. If not installed you need to provide/download at least one method in methods/ to run any benchmark
 # matplotlib: used for demo and plotting validation results in read_results.ipynb
-# nvidia-ml-py: to measure VRAM usage
+# nvidia-ml-py: to measure VRAM usage in speed and memory benchmark
 # PIL: used in some visualizations, but not strictly needed for benchmarking
+# pydegensac: enables better geometric estimation in our imc and hpatches implmentations. Might lead to higher performance
+# tqdm: used to nicely display loops bars progression
 # xformers: to increase speed when using transformer-based models (e.g., DeDoDe, RDD)
 pip install \
   kornia==0.8.0 \
   matplotlib==3.10.1 \
   nvidia-ml-py==13.580.82 \
   Pillow==11.1.0 \
+  pydegensac \
+  tqdm==4.67.1 \
   xformers==0.0.29.post2 
 
 # To run IMC, these are also needed
 pip install \
-  matplotlib==3.10.1 \
+  jsmin \
+  matplotlib \
   pydegensac \
   schema \
   scipy \
   shortuuid \
-  jsmin
+  tqdm
+  
 ```
 Other dependencies might be related to third party specific methods. 
 
@@ -248,14 +254,13 @@ That’s it, you’re ready to benchmark.
 
 #### MISC
 * [ ] Reduce dependencies
-    - __pandas__ is used only in Hpatches and read_results, can be eventually put as optional
-    - __cv2__ can be replaced with pydegensac+kornia (gemo. estim.) and torchvision for I/O
+    - __pandas__ is used only in Hpatches and read_results, can be eventually put as optional and handled as list of dicts all with same keys
 
 #### Benchmarks
 * [ ] IMC
     - Add multiview support, now only stereo
-* [ ] Add support for matchers (LoFTR, RoMA, etc)
-* [ ] Add MD Air-to-Ground and MD View from RDD
+* [ ] Add support for matchers (LoFTR, RoMA, etc) by changing feature extraction method and separating kpts/depth dicts. No need to repead depth extraction.
+* [ ] Add MD Air-to-Ground and MD View from RDD. This should be easy and quick.
 
 
 
