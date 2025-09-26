@@ -6,7 +6,6 @@ import torch
 import logging
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from torch import Tensor
 from pathlib import Path
 from typing import Tuple, Dict, List
@@ -16,6 +15,26 @@ from concurrent.futures import ThreadPoolExecutor
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logger.info(
+        "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
+    )
+    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+
+try:
+    import pydegensac
+
+    pydegensac_found = True
+except ImportError:
+    pydegensac_found = False
+    import cv2
+
+    logger.warning(
+        "pydegensac not found, running RANSAC from cv2 which is less robust. Install it with `pip install pydegensac`."
+    )
 
 
 def load_hpatches_in_memory(wrapper, root: str | Path, max_workers: int = 16) -> Dict:
@@ -297,14 +316,26 @@ def compute_corner_error(
     H_gt = H0_1.detach()
 
     def _solve_one(thr: float):
-        H_est, mask = cv2.findHomography(
-            xy0_np,
-            xy1_np,
-            method=cv2.RANSAC,
-            ransacReprojThreshold=float(thr),
-            maxIters=int(ransac_max_iters),
-            confidence=0.99999999,
-        )
+        if pydegensac_found:
+            H_est, mask = pydegensac.findHomography(
+                xy0_np,
+                xy1_np,
+                px_th=thr,  # pydegensac threshold is diameter, not radius
+                max_iters=ransac_max_iters,
+                conf=0.99999999,
+                laf_consistensy_coef=0,
+                error_type="sampson",
+                symmetric_error_check=True,
+            )
+        else:
+            H_est, mask = cv2.findHomography(
+                xy0_np,
+                xy1_np,
+                method=cv2.RANSAC,
+                ransacReprojThreshold=float(thr),
+                maxIters=int(ransac_max_iters),
+                confidence=0.99999999,
+            )
         if H_est is None:
             return {
                 "valid_homography": False,

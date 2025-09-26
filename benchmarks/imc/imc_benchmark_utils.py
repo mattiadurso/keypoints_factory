@@ -10,12 +10,10 @@ import h5py
 import json
 import logging
 import subprocess
-import pydegensac
 import torch as th
 import numpy as np
 import pandas as pd
 from torch import Tensor
-from tqdm.auto import tqdm
 from functools import partial
 from typing import Union, Dict
 from itertools import combinations
@@ -24,6 +22,26 @@ from joblib import Parallel, delayed
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    logger.info(
+        "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
+    )
+    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+
+try:
+    import pydegensac
+
+    pydegensac_found = True
+except ImportError:
+    pydegensac_found = False
+    import cv2
+
+    logger.warning(
+        "pydegensac not found, running RANSAC from cv2 which is less robust. Install it with `pip install pydegensac`."
+    )
 
 validation_scenes = ["reichstag", "sacre_coeur", "st_peters_square"]
 test_scenes = [
@@ -133,17 +151,28 @@ def filter_matches(
     kpts1_matched = kpts1[pair_matches[:, 1]].cpu().numpy()
 
     if kpts0_matched.shape[0] > 7 and kpts1_matched.shape[0] > 7:
-        F, inlier_mask = pydegensac.findFundamentalMatrix(
-            kpts0_matched,
-            kpts1_matched,
-            px_th=filtering_params["threshold"],
-            conf=filtering_params["confidence"],
-            max_iters=filtering_params["max_iter"],
-            laf_consistensy_coef=0,
-            error_type=filtering_params["error_type"],
-            symmetric_error_check=True,
-            enable_degeneracy_check=filtering_params["degeneracy_check"],
-        )
+        if pydegensac_found:
+            F, inlier_mask = pydegensac.findFundamentalMatrix(
+                kpts0_matched,
+                kpts1_matched,
+                px_th=filtering_params["threshold"],
+                conf=filtering_params["confidence"],
+                max_iters=filtering_params["max_iter"],
+                laf_consistensy_coef=0,
+                error_type=filtering_params["error_type"],
+                symmetric_error_check=True,
+                enable_degeneracy_check=filtering_params["degeneracy_check"],
+            )
+        else:
+            F, inlier_mask = cv2.findFundamentalMat(
+                kpts0_matched,
+                kpts1_matched,
+                method=cv2.FM_RANSAC,
+                ransacReprojThreshold=filtering_params["threshold"],
+                confidence=filtering_params["confidence"],
+                maxIters=filtering_params["max_iter"],
+            )
+            inlier_mask = inlier_mask.ravel().astype(bool)
 
         return {pair_name: pair_matches[inlier_mask].T}
     else:
