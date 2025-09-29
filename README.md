@@ -3,6 +3,8 @@
 Keypoint Factory is a lightweight suite of local wrappers for feature detection and description. It downloads third-party implementations and implements a unified interface, allowing users to test and compare methods quickly. Exact results might slightly change according to different library versions, hardware, different num
 ber of jobs, or other unknown factors.
 
+Currently it's possible to run one wrapper on **8** different benchmarks.
+
 SANDesc is supported but not released yet; thus, those parts might be commented or never used.
 
 ## Quick Start
