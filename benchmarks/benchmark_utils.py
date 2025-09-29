@@ -20,7 +20,12 @@ def fake_tqdm(x, **kwargs):
 
 def parse_poses(poses_file, benchmark_name):
     """Parse poses from a given file based on the benchmark format."""
-    if benchmark_name in ["megadepth1500", "graz_high_res"]:
+    if benchmark_name in [
+        "megadepth1500",
+        "graz_high_res",
+        "megadepth_view",
+        "megadepth_air2ground",
+    ]:
         return parse_md1500_poses(poses_file)
     elif benchmark_name in ["scannet1500"]:
         # Implement parse_scannet1500_poses if needed
@@ -190,7 +195,12 @@ def fix_rng(seed=42):
 
 def parse_pair(pair, benchmark_name):
     """Parse a line from a .pairs file"""
-    if benchmark_name in ["megadepth1500", "graz_high_res"]:
+    if benchmark_name in [
+        "megadepth1500",
+        "graz_high_res",
+        "megadepth_view",
+        "megadepth_air2ground",
+    ]:
         # Pose is stores as "... flat(R) flat(t)""
         parts = pair.strip().split()
         img1, img2 = parts[0], parts[1]

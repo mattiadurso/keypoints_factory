@@ -1,6 +1,7 @@
 # Keypoint Factory
 
-Keypoint Factory is a lightweight suite of local wrappers for feature detection and description. It downloads third-party implementations and implements a unified interface, allowing users to test and compare methods quickly. Exact results might slightly change according to different library versions, hardware, or other unknown factors.
+Keypoint Factory is a lightweight suite of local wrappers for feature detection and description. It downloads third-party implementations and implements a unified interface, allowing users to test and compare methods quickly. Exact results might slightly change according to different library versions, hardware, different num
+ber of jobs, or other unknown factors.
 
 SANDesc is supported but not released yet; thus, those parts might be commented or never used.
 
@@ -126,7 +127,7 @@ python benchmarks/graz_high_res/run.py                       # For battery tests
 ```
 
 ### MegaDepth-1500
-[MegaDepth-1500](https://arxiv.org/abs/2104.00680) (MD1500) is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We assign a score of 180 degrees (the worst score) when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, we suggest evaluating methods at keypoint budgets of 2K and 30K. On an RTX 4090 and using 16 cores, SuperPoint completes the benchmark in less than a minute.
+[MegaDepth-1500](https://arxiv.org/abs/2104.00680) is a curated subset of the MegaDepth dataset, designed to maintain a uniform covisibility ratio across image pairs, unlike IMC where the distribution is Gaussian-shaped. We assign a score of 180 degrees (the worst score) when essential matrix recovery fails or the error is greater than 10 degrees. To ensure fairness, we suggest evaluating methods at keypoint budgets of 2K and 30K. On an RTX 4090 and using 16 cores, SuperPoint completes the benchmark in less than a minute.
 
 The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
 
@@ -135,6 +136,28 @@ Use the following command to run it:
 python benchmarks/benchmark_parallel.py --benchmark-name md  # For a single test
 python benchmarks/megadepth1500/run.py                       # For battery tests
 ```
+------
+### MegaDepth-View 
+[MegaDepth-View](https://arxiv.org/abs/2505.08013) test set is derived from MegaDepth test scenes (Internet photos with COLMAP poses & MVS depths). Image pairs are **mined** from the existing MegaDepth reconstructions by **bi-directionally warping** with known poses/depth and keeping pairs with **2k–20k matching pixels**, yielding **1,487 pairs** that emphasize large viewpoint/scale changes. 
+
+The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolution Benchmark.
+
+Use the following command to run it:
+```bash
+python benchmarks/benchmark_parallel.py --benchmark-name mdv  # For a single test
+```
+
+---
+### Megadepth Air-to-Ground
+[MegaDepth Air-to-Ground](https://arxiv.org/abs/2505.08013) test set is made of images that are collected by authors gathering **Internet drone videos** and **ground photos** across 41 landmarks; frames from the drone videos are extracted and jointly reconstructed with the ground images in COLMAP to obtain camera poses and depths (~27k images, >600k candidate pairs). Depth maps are post-processed (mask sky/vehicles/people via ADE20K segmentation; remove small/isolated regions) to improve warping quality. The final test set comprises 1,500 randomly selected pairs that are selected via the same warping-based overlap test as MegaDepth-View.
+
+The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolution Benchmark.
+
+Use the following command to run it:
+```bash
+python benchmarks/benchmark_parallel.py --benchmark-name mda  # For a single test
+```
+
 
 ------
 ### ScanNet-1500

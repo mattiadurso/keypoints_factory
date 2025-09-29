@@ -67,6 +67,7 @@ class Benchmark:
         descriptors_path: str = None,
         compute_repeatability: bool = False,
         device: str = "cuda",
+        oom_safe: bool = False,
         px_thrs: list = [1, 3, 5],
     ):
         self.benchmark_name = benchmark_name
@@ -79,6 +80,7 @@ class Benchmark:
         self.seed = seed
         self.scaling_factor = scaling_factor  # mostly for GHR
         self.ghr_partial = ghr_partial
+        self.oom_safe = oom_safe
         self.keypoints_path = keypoints_path
         self.descriptors_path = descriptors_path
         if scaling_factor != 1 and compute_repeatability:
@@ -114,6 +116,11 @@ class Benchmark:
         if benchmark_name.lower() == "megadepth1500":
             self.images_path = self.dataset_path / "images"
             self.depths_path = self.dataset_path / "depths"
+            self.views_path = self.dataset_path / "views.txt"
+            self.views_dict = parse_poses(self.views_path, self.benchmark_name)
+
+        elif benchmark_name.lower() in ["megadepth_air2ground", "megadepth_view"]:
+            self.images_path = self.dataset_path / "images"
             self.views_path = self.dataset_path / "views.txt"
             self.views_dict = parse_poses(self.views_path, self.benchmark_name)
 
@@ -180,6 +187,12 @@ class Benchmark:
                 keypoints_dict[img_name] = {"kpts": out.kpts.detach().cpu()}
                 descriptors_dict[img_name] = out.des.detach().cpu()
 
+                # this slows down a bit, but some methods might go OOM. disable if not needed
+                if self.oom_safe:
+                    del img, out
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
                 if self.compute_repeatability:
                     # load depth
                     if self.benchmark_name == "megadepth1500":
@@ -212,9 +225,11 @@ class Benchmark:
         # free memory, this stuff is no longer needed
         if self.compute_repeatability:
             del Z, Z_sampled
-        del wrapper, img, out
-        gc.collect()
-        torch.cuda.empty_cache()
+
+        if self.oom_safe:
+            del wrapper
+            gc.collect()
+            torch.cuda.empty_cache()
 
         return keypoints_dict, descriptors_dict
 
@@ -292,10 +307,10 @@ class Benchmark:
                 "t": t,
             }
 
-        # free memory, this stuff is no longer needed
-        del desc1, desc2, matches, matcher
-        gc.collect()
-        torch.cuda.empty_cache()
+        if self.oom_safe:
+            del desc1, desc2, matches, matcher
+            gc.collect()
+            torch.cuda.empty_cache()
 
         # Compute repeatability
         if self.compute_repeatability:
@@ -344,23 +359,24 @@ class Benchmark:
                 rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
 
             # clean up
-            del (
-                kpts1,
-                kpts2,
-                Z1,
-                Z2,
-                K1,
-                K2,
-                P1,
-                P2,
-                img1,
-                img2,
-                img1_size,
-                img2_size,
-                rep,
-            )
-            gc.collect()
-            torch.cuda.empty_cache()
+            if self.oom_safe:
+                del (
+                    kpts1,
+                    kpts2,
+                    Z1,
+                    Z2,
+                    K1,
+                    K2,
+                    P1,
+                    P2,
+                    img1,
+                    img2,
+                    img1_size,
+                    img2_size,
+                    rep,
+                )
+                gc.collect()
+                torch.cuda.empty_cache()
 
         else:
             rep_results = {}
@@ -559,6 +575,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--skip-repeatability", action="store_false", help="Don't compute repeatability"
     )
+    parser.add_argument(
+        "--oom-safe",
+        action="store_true",
+        help="Use OOM-safe feature extraction (might be slower) when method goes OOM.",
+    )
     args = parser.parse_args()
 
     device = args.device
@@ -567,6 +588,10 @@ if __name__ == "__main__":
 
     if benchmark_name.lower() in ["md", "md1500", "megadepth1500"]:
         benchmark_name = "megadepth1500"
+    elif benchmark_name.lower() in ["mdv", "megadepth_view"]:
+        benchmark_name = "megadepth_view"
+    elif benchmark_name.lower() in ["mda", "mda2g", "md_air2ground"]:
+        benchmark_name = "megadepth_air2ground"
     elif benchmark_name.lower() in ["sc", "scannet", "sc1500", "scannet1500"]:
         benchmark_name = "scannet1500"
     elif benchmark_name.lower() in ["graz", "ghr", "graz_high_res"]:
@@ -590,6 +615,7 @@ if __name__ == "__main__":
     seed = args.seed
     scaling_factor = args.scaling_factor
     ghr_partial = args.ghr_partial
+    oom_safe = args.oom_safe
     keypoints_path = args.keypoints_path
     descriptors_path = args.descriptors_path
     compute_repeatability = args.skip_repeatability
@@ -632,7 +658,7 @@ if __name__ == "__main__":
     if args.run_tag is not None:
         key = f"{key} {args.run_tag}"
 
-    logger.info(f"\n>>> Running parallel benchmark for {key}...<<<\n")
+    logger.info(f"\n\n>>> Running parallel benchmark for {key}...<<<\n")
 
     # create if not exists
     results_path = Path(f"benchmarks/{benchmark_name}/results")
@@ -661,6 +687,7 @@ if __name__ == "__main__":
         max_kpts=max_kpts,
         njobs=njobs,
         seed=seed,
+        oom_safe=oom_safe,
         scaling_factor=scaling_factor,
         ghr_partial=ghr_partial,
         keypoints_path=keypoints_path,
