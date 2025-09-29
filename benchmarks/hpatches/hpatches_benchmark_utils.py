@@ -25,7 +25,7 @@ except ImportError:
     from benchmarks.benchmark_utils import fake_tqdm as tqdm
 
 try:
-    import pydegensac
+    import pydegensac_  # some errors arises, to fix. For now disabled.
 
     pydegensac_found = True
 except ImportError:

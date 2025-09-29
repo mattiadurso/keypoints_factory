@@ -100,13 +100,13 @@ class HPatchesBenchmark:
 
         # save keypoints and descriptors in a dict
         features_dict = {"keypoints": keypoints, "descriptors": descriptors}
-        os.makedirs("benchmarks/hpatches/features", exist_ok=True)
+        os.makedirs("benchmarks/hpatches/intermediate", exist_ok=True)
         torch.save(
             features_dict,
-            f"benchmarks/hpatches/features/{wrapper.name}_{self.max_kpts}kpts.pth",
+            f"benchmarks/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth",
         )
         logger.info(
-            f"Features saved to benchmarks/hpatches/features/{wrapper.name}_{self.max_kpts}kpts.pth"
+            f"Features saved to benchmarks/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth"
         )
         return keypoints, descriptors
 
