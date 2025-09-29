@@ -63,9 +63,9 @@ class DeDoDeWrapper(MethodWrapper):
     def _extract(self, x, max_kpts: int = 2048, custom_kpts=None) -> MethodOutput:
         x = x if x.dim() == 4 else x[None]
 
-        # eventually cropping to multiples of 14
+        # eventually cropping/padding to multiples of 14
         if self.descriptor_G:
-            x = self.crop_multiple_of(x, multiple_of=14)
+            x = self.crop_to_multiple_of(x, multiple_of=14)
 
         batch = {"image": self.normalize_image(x, self.mean, self.std)}
 

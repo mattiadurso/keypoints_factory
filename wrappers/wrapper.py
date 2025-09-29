@@ -108,7 +108,7 @@ class MethodWrapper(ABC):
                 align_corners=False,
             ).squeeze(0)
         # crop to multiple of 16
-        img = self.crop_multiple_of(img, multiple_of=16)
+        img = self.crop_to_multiple_of(img, multiple_of=16)
 
         return img.to(self.device)
 
@@ -130,7 +130,7 @@ class MethodWrapper(ABC):
         t = t.permute(2, 0, 1).contiguous()  # CxHxW
         return t
 
-    def crop_multiple_of(self, img, multiple_of=16):
+    def crop_to_multiple_of(self, img, multiple_of=16):
         if isinstance(img, np.ndarray):
             H, W = img.shape[:2]
             new_H = (H // multiple_of) * multiple_of
