@@ -413,11 +413,10 @@ class Benchmark:
             batch_data.append(current_batch)
 
         # Generate seeds for each worker to ensure reproducibility
-        base_seed = self.seed
-        worker_seeds = [base_seed + i for i in range(len(batch_data))]
+        worker_seeds = [self.seed for i in range(len(batch_data))]
 
-        # Ensure no GPU usage in parallel jobs
-        _prev = os.environ.get("CUDA_VISIBLE_DEVICES")  # e.g. "0,1" or None
+        # hide GPUs
+        _prev = os.environ.get("CUDA_VISIBLE_DEVICES")
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
         # Process batches in parallel with proper seeding
@@ -523,7 +522,7 @@ if __name__ == "__main__":
         help="Path to dataset",
     )
     parser.add_argument(
-        "--njobs", type=int, default=16, help="Number of parallel jobs"
+        "--njobs", type=int, default=-1, help="Number of parallel jobs"
     )  # might slightly affect reproducibility and results
     parser.add_argument(
         "--ratio-test", type=float, default=1.0, help="Ratio test threshold"
@@ -604,7 +603,7 @@ if __name__ == "__main__":
         if args.data_path is not None
         else f"benchmarks/{benchmark_name}/data"
     )
-    njobs = args.njobs
+    njobs = args.njobs if args.njobs != -1 else os.cpu_count()
     ratio_test = args.ratio_test
     min_score = args.min_score
     ransac_th = args.ransac_th

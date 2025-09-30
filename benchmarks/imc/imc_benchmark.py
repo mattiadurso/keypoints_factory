@@ -231,7 +231,7 @@ if __name__ == "__main__":
     if args.run_tag is not None:
         key = f"{key} {args.run_tag}"
 
-    print(f"\n>>> Running benchmark for {key} <<<\n")
+    print(f"\n\n>>> Running benchmark for {key} <<<\n")
 
     # Define the benchmark
     benchmark = IMC21MNNBenchmark(
