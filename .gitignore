@@ -2,12 +2,16 @@
 **/*.pth
 methods/*
 **/**/*.csv
-benchmarks/*/data
 sandesc_models/*
 __bin/*
 nohup.out
 benchmarks/read_linear_scaling_dedode.ipynb
-benchmarks/*/intermediate/*
+
+# IMC benchmark files
 benchmarks/imc/to_import_imc/*
-benchmarks/imc/*benchmark*
-benchmarks/*/results*/
+benchmarks/imc/image-matching-benchmark
+
+# results, data and intermediate files
+benchmarks/*/intermediate/*
+benchmarks/*/*results/
+benchmarks/*/data
