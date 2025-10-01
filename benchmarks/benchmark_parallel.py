@@ -80,7 +80,7 @@ class Benchmark:
         self.scaling_factor = scaling_factor  # mostly for GHR
         self.ghr_partial = ghr_partial
         self.oom_safe = oom_safe
-        self.feature_path = Path(feature_path)
+        self.feature_path = feature_path
         if scaling_factor != 1 and compute_repeatability:
             logger.warning(
                 "Repeatability computation might be incorrect when \
@@ -139,6 +139,7 @@ class Benchmark:
 
         # Load precomputed features if provided
         if self.feature_path is not None:
+            self.feature_path = Path(self.feature_path)
             self.keypoints_dict = torch.load(
                 self.feature_path / "keypoints.pt",
                 map_location="cpu",
@@ -186,12 +187,6 @@ class Benchmark:
                 keypoints_dict[img_name] = {"kpts": out.kpts.detach().cpu()}
                 descriptors_dict[img_name] = out.des.detach().cpu()
 
-                # this slows down a bit, but some methods might go OOM. disable if not needed
-                if self.oom_safe:
-                    del img, out
-                    gc.collect()
-                    torch.cuda.empty_cache()
-
                 if self.compute_repeatability:
                     # load depth
                     if self.benchmark_name == "megadepth1500":
@@ -221,14 +216,13 @@ class Benchmark:
                 logger.info(f"Error processing {img_name}: {e}")
                 continue
 
-        # free memory, this stuff is no longer needed
-        if self.compute_repeatability:
-            del Z, Z_sampled
-
-        if self.oom_safe:
-            del wrapper
-            gc.collect()
-            torch.cuda.empty_cache()
+            # This might slow down a bit, but some methods might go OOM. Don't use if not needed
+            if self.oom_safe:
+                if self.compute_repeatability:
+                    del Z, Z_sampled
+                del wrapper, out, img
+                gc.collect()
+                torch.cuda.empty_cache()
 
         return keypoints_dict, descriptors_dict
 
@@ -306,10 +300,10 @@ class Benchmark:
                 "t": t,
             }
 
-        if self.oom_safe:
-            del desc1, desc2, matches, matcher
-            gc.collect()
-            torch.cuda.empty_cache()
+            if self.oom_safe:
+                del desc1, desc2, matches
+                gc.collect()
+                torch.cuda.empty_cache()
 
         # Compute repeatability
         if self.compute_repeatability:
@@ -353,30 +347,29 @@ class Benchmark:
                     for k in rep[b]:
                         rep_results[k].append(rep[b][k])
 
+                # clean up
+                if self.oom_safe:
+                    del (
+                        kpts1,
+                        kpts2,
+                        Z1,
+                        Z2,
+                        K1,
+                        K2,
+                        P1,
+                        P2,
+                        img1,
+                        img2,
+                        img1_size,
+                        img2_size,
+                        rep,
+                    )
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
             # average over all pairs
             for k in rep_results:
                 rep_results[k] = sum(rep_results[k]) / len(rep_results[k])
-
-            # clean up
-            if self.oom_safe:
-                del (
-                    kpts1,
-                    kpts2,
-                    Z1,
-                    Z2,
-                    K1,
-                    K2,
-                    P1,
-                    P2,
-                    img1,
-                    img2,
-                    img1_size,
-                    img2_size,
-                    rep,
-                )
-                gc.collect()
-                torch.cuda.empty_cache()
-
         else:
             rep_results = {}
         return matches_dict, rep_results
@@ -424,7 +417,7 @@ class Benchmark:
         """Run the complete benchmark."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Enhanced randomness fixing for parallel processing
+        # Fixing randomness for parallel processing
         fix_rng(seed=self.seed)
 
         # Create save key for features with timestamp (similar to GHR pattern)
@@ -519,9 +512,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--custom-desc", type=str, default=None, help="Path to custom descriptors"
     )
-    parser.add_argument(
-        "--stats", type=bool, default=True, help="Save statistics"
-    )  # not used, kept for compatibility. Now I save kpts stats anyway
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility"
     )
