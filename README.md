@@ -125,8 +125,7 @@ The benchmark computes the following metrics:
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name ghr # For a single test
-python benchmarks/graz_high_res/run.py                       # For battery tests
+python benchmarks/benchmark_parallel.py --benchmark-name ghr 
 ```
 
 ### MegaDepth-1500
@@ -136,8 +135,7 @@ The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name md  # For a single test
-python benchmarks/megadepth1500/run.py                       # For battery tests
+python benchmarks/benchmark_parallel.py --benchmark-name md  
 ```
 ------
 ### MegaDepth-View 
@@ -147,7 +145,7 @@ The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolu
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name mdv  # For a single test
+python benchmarks/benchmark_parallel.py --benchmark-name mdv  
 ```
 
 ---
@@ -158,7 +156,7 @@ The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolu
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name mda  # For a single test
+python benchmarks/benchmark_parallel.py --benchmark-name mda  
 ```
 
 
@@ -170,8 +168,7 @@ The benchmark computes the same metrics as the Graz High-Resolution Benchmark, e
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name sc  # For a single test
-python benchmarks/scannet1500/run.py                         # For battery tests
+python benchmarks/benchmark_parallel.py --benchmark-name sc  
 ```
 
 ------
@@ -197,8 +194,7 @@ The benchmark computes the following metrics:
 
 Use the following command to run it:
 ```bash
-python benchmarks/hpatches/hpatches_benchmark.py  # For a single test
-python benchmarks/hpatches/run_hpatches.py        # For battery tests
+python benchmarks/hpatches/hpatches_benchmark.py 
 ```
 --- 
 
