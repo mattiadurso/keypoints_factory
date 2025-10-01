@@ -25,12 +25,12 @@ from functools import partial
 from joblib import Parallel, delayed, parallel_backend
 
 from matchers.mnn import MNN
-from benchmarks.benchmark_utils import (
+from benchmarks.utils_benchmark import (
     fix_rng,
     parse_pair,
     print_metrics,
     pose_auc,
-    process_pose_estimation_batch,
+    process_pose_estimation,
     parse_poses,
     load_depth,
 )
@@ -47,7 +47,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+    from benchmarks.utils_benchmark import fake_tqdm as tqdm
 
 
 class Benchmark:
@@ -63,8 +63,7 @@ class Benchmark:
         seed: int = 0,
         scaling_factor: float = 1.0,
         ghr_partial: bool = False,
-        keypoints_path: str = None,
-        descriptors_path: str = None,
+        feature_path: str = None,
         compute_repeatability: bool = False,
         device: str = "cuda",
         oom_safe: bool = False,
@@ -81,8 +80,7 @@ class Benchmark:
         self.scaling_factor = scaling_factor  # mostly for GHR
         self.ghr_partial = ghr_partial
         self.oom_safe = oom_safe
-        self.keypoints_path = keypoints_path
-        self.descriptors_path = descriptors_path
+        self.feature_path = Path(feature_path)
         if scaling_factor != 1 and compute_repeatability:
             logger.warning(
                 "Repeatability computation might be incorrect when \
@@ -140,18 +138,19 @@ class Benchmark:
         self.matcher_params = {"min_score": min_score, "ratio_test": ratio_test}
 
         # Load precomputed features if provided
-        self.use_precomputed = (
-            keypoints_path is not None and descriptors_path is not None
-        )
-        if self.use_precomputed:
+        if self.feature_path is not None:
             self.keypoints_dict = torch.load(
-                keypoints_path, map_location="cpu", weights_only=False
+                self.feature_path / "keypoints.pt",
+                map_location="cpu",
+                weights_only=False,
             )
             self.descriptors_dict = torch.load(
-                descriptors_path, map_location="cpu", weights_only=False
+                self.feature_path / "descriptors.pt",
+                map_location="cpu",
+                weights_only=False,
             )
             logger.info(
-                f"Using precomputed features from {keypoints_path} and {descriptors_path}"
+                f"Using precomputed features from {self.feature_path / 'keypoints.pt'} and {self.feature_path / 'descriptors.pt'}"
             )
         else:
             self.keypoints_dict = None
@@ -253,7 +252,7 @@ class Benchmark:
         """Match all pairs in batch mode."""
 
         # Get features (either precomputed or extract with wrapper)
-        if self.use_precomputed:
+        if self.feature_path is not None:
             keypoints_dict = self.keypoints_dict
             descriptors_dict = self.descriptors_dict
         else:
@@ -383,16 +382,11 @@ class Benchmark:
         return matches_dict, rep_results
 
     def batch_pose_estimation(self, matches_dict):
-        """Perform pose estimation in parallel batches."""
-        logger.info("Starting parallel pose estimation...")
-
-        # Prepare data for parallel processing
-        batch_data = []
-        batch_size = len(matches_dict) // self.njobs
-
-        current_batch = []
+        """Perform pose estimation in parallel."""
+        # Prepare data for parallel processing - no batching needed
+        all_pairs = []
         for (img1, img2), data in matches_dict.items():
-            current_batch.append(
+            all_pairs.append(
                 (
                     (img1, img2),
                     data["matches"],
@@ -405,40 +399,23 @@ class Benchmark:
                 )
             )
 
-            if len(current_batch) >= batch_size:
-                batch_data.append(current_batch)
-                current_batch = []
-
-        if current_batch:  # Add remaining pairs
-            batch_data.append(current_batch)
-
-        # Generate seeds for each worker to ensure reproducibility
-        worker_seeds = [self.seed for i in range(len(batch_data))]
-
-        # hide GPUs
+        # Hide GPUs
         _prev = os.environ.get("CUDA_VISIBLE_DEVICES")
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-        # Process batches in parallel with proper seeding
-        pose_estimation_partial = partial(
-            process_pose_estimation_batch, th=self.ransac_th
-        )
+        # Process pairs in parallel
+        pose_estimation_partial = partial(process_pose_estimation, th=self.ransac_th)
 
-        batch_results = Parallel(n_jobs=self.njobs, verbose=1)(
-            delayed(pose_estimation_partial)(batch, worker_seed=seed)
-            for batch, seed in zip(batch_data, worker_seeds)
+        results = Parallel(n_jobs=self.njobs, verbose=0)(
+            delayed(pose_estimation_partial)(pair)
+            for pair in tqdm(all_pairs, desc="Pose Estimation")
         )
 
         # Revert GPU settings
         if _prev is None:
-            os.environ.pop("CUDA_VISIBLE_DEVICES", None)  # removes the var
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
         else:
             os.environ["CUDA_VISIBLE_DEVICES"] = _prev
-
-        # Flatten results
-        results = []
-        for batch_result in batch_results:
-            results.extend(batch_result)
 
         return results
 
@@ -464,10 +441,8 @@ class Benchmark:
 
         wrapper.move_to("cpu")  # to avoid issues in parallel jobs
 
-        # Force loky backend for better isolation and reproducibility
-        with parallel_backend("loky", n_jobs=self.njobs):
-            # Phase 2: Parallel pose estimation
-            results = self.batch_pose_estimation(matches_dict)
+        # Phase 2: Parallel pose estimation
+        results = self.batch_pose_estimation(matches_dict)
 
         wrapper.move_to(self.device)  # move back to original device
 
@@ -562,15 +537,11 @@ if __name__ == "__main__":
         help="Compute partial GHR benchmark (only graz_main_square scene)",
     )
     parser.add_argument(
-        "--keypoints-path",
+        "--feature-path",
         default=None,
-        help="Path to precomputed keypoints (optional)",
+        help="Path to precomputed features (optional)",
     )
-    parser.add_argument(
-        "--descriptors-path",
-        default=None,
-        help="Path to precomputed descriptors (optional)",
-    )
+
     parser.add_argument(
         "--skip-repeatability", action="store_false", help="Don't compute repeatability"
     )
@@ -615,8 +586,7 @@ if __name__ == "__main__":
     scaling_factor = args.scaling_factor
     ghr_partial = args.ghr_partial
     oom_safe = args.oom_safe
-    keypoints_path = args.keypoints_path
-    descriptors_path = args.descriptors_path
+    feature_path = args.feature_path
     compute_repeatability = args.skip_repeatability
 
     # Define the wrapper
@@ -689,8 +659,7 @@ if __name__ == "__main__":
         oom_safe=oom_safe,
         scaling_factor=scaling_factor,
         ghr_partial=ghr_partial,
-        keypoints_path=keypoints_path,
-        descriptors_path=descriptors_path,
+        feature_path=feature_path,
         compute_repeatability=compute_repeatability,
         device=device,
     )
@@ -698,7 +667,7 @@ if __name__ == "__main__":
     # Run the benchmark
     s = time.time()
     # Create a simpler save key for features (wrapper_name + max_kpts)
-    feature_save_key = f"{wrapper_name}_kpts_{max_kpts}"
+    feature_save_key = f"{wrapper.name}_kpts_{max_kpts}"
     results, timestamp = benchmark.benchmark(wrapper, save_key=feature_save_key)
     print_metrics(wrapper, results)
     print("-------------------------------------------------------------")

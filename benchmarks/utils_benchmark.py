@@ -89,51 +89,50 @@ def parse_md1500_poses(poses_file):
     return view_dict
 
 
-def process_pose_estimation_batch(pair_matches_data, th, worker_seed=None):
+def process_pose_estimation(pair_matches_data, th):
     """Process pose estimation for a batch of pairs."""
     fix_rng(42)
 
     results = []
 
-    for (img1, img2), matches, kpts1, kpts2, K1, K2, R, t in pair_matches_data:
-        try:
-            if len(matches) < 5:
-                results.append((img1, img2, 180, 180, 180, 0))
-                continue
+    (img1, img2), matches, kpts1, kpts2, K1, K2, R, t = pair_matches_data
+    try:
+        if len(matches) < 5:
+            return (img1, img2, 180, 180, 180, 0)
 
-            # Get matched keypoints
-            matched_kpts1 = kpts1[matches[:, 0]]
-            matched_kpts2 = kpts2[matches[:, 1]]
+        # Get matched keypoints
+        matched_kpts1 = kpts1[matches[:, 0]]
+        matched_kpts2 = kpts2[matches[:, 1]]
 
-            # Shuffle matches
-            shuffling = np.random.permutation(len(matched_kpts1))
-            matched_kpts1 = matched_kpts1[shuffling]
-            matched_kpts2 = matched_kpts2[shuffling]
+        # Shuffle matches
+        shuffling = np.random.permutation(len(matched_kpts1))
+        matched_kpts1 = matched_kpts1[shuffling]
+        matched_kpts2 = matched_kpts2[shuffling]
 
-            # Pose estimation
-            threshold = th
-            norm_threshold = threshold / (
-                np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2]))
-            )
+        # Pose estimation
+        threshold = th
+        norm_threshold = threshold / (
+            np.mean(np.abs(K1[:2, :2])) + np.mean(np.abs(K2[:2, :2]))
+        )
 
-            R_est, t_est, mask = estimate_pose(
-                matched_kpts1, matched_kpts2, K1, K2, norm_threshold, conf=0.99999
-            )
+        R_est, t_est, mask = estimate_pose(
+            matched_kpts1, matched_kpts2, K1, K2, norm_threshold, conf=0.99999
+        )
 
-            T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)
-            e_t, e_R = compute_pose_error(T1_to_2_est, R, t)
-            e_pose = min(10, max(e_t, e_R))
-            num_inliers = np.sum(mask)
+        T1_to_2_est = np.concatenate((R_est, t_est), axis=-1)
+        e_t, e_R = compute_pose_error(T1_to_2_est, R, t)
+        e_pose = min(10, max(e_t, e_R))
+        num_inliers = np.sum(mask)
 
-            results.append((img1, img2, e_t, e_R, e_pose, num_inliers))
-            logger.debug(
-                f"Pair ({img1}, {img2}): e_t={e_t:.2f}, e_R={e_R:.2f}, e_pose={e_pose:.2f}, inliers={num_inliers}"
-            )
+        results = (img1, img2, e_t, e_R, e_pose, num_inliers)
+        logger.debug(
+            f"Pair ({img1}, {img2}): e_t={e_t:.2f}, e_R={e_R:.2f}, e_pose={e_pose:.2f}, inliers={num_inliers}"
+        )
 
-        except Exception as e:
-            results.append((img1, img2, 180, 180, 180, 0))
+    except Exception as e:
+        results = (img1, img2, 180, 180, 180, 0)
 
-            logging.debug(f"Error processing pair ({img1}, {img2}): {e}")
+        logging.debug(f"Error processing pair ({img1}, {img2}): {e}")
 
     return results
 
