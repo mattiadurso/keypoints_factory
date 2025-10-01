@@ -12,7 +12,7 @@ import torch
 import logging
 
 from matchers.mnn import MNN
-from benchmarks.imc.imc_benchmark_utils import (
+from benchmarks.imc.utils_imc_benchmark import (
     extract_image_matching_benchmark,
     match_features,
     import_data_to_benchmark,
@@ -185,6 +185,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Overwrite existing features",
     )
+    parser.add_argument(
+        "--sandesc1",
+        action="store_true",
+        help="Use SANDesc (original) instead of SANDescD (DINO-based).",
+    )
     args = parser.parse_args()
 
     device = args.device
@@ -195,34 +200,68 @@ if __name__ == "__main__":
     th = args.th
     custom_desc = args.custom_desc
     njobs = args.njobs
-    # multiview = args.multiview
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
 
     if custom_desc is not None:
-        #  Eventually add my descriptors
-        weights = torch.load(custom_desc, weights_only=False)
-        config = weights["config"]
-        model_config = {
-            "ch_in": config["model_config"]["unet_ch_in"],
-            "kernel_size": config["model_config"]["unet_kernel_size"],
-            "activ": config["model_config"]["unet_activ"],
-            "norm": config["model_config"]["unet_norm"],
-            "skip_connection": config["model_config"]["unet_with_skip_connections"],
-            "spatial_attention": config["model_config"]["unet_spatial_attention"],
-            "third_block": config["model_config"]["third_block"],
-        }
+        if args.sandesc1:
+            #  Eventually add my descriptors
+            weights = torch.load(custom_desc, weights_only=False)
+            config = weights["config"]
+            model_config = {
+                "ch_in": config["model_config"]["unet_ch_in"],
+                "kernel_size": config["model_config"]["unet_kernel_size"],
+                "activ": config["model_config"]["unet_activ"],
+                "norm": config["model_config"]["unet_norm"],
+                "skip_connection": config["model_config"]["unet_with_skip_connections"],
+                "spatial_attention": config["model_config"]["unet_spatial_attention"],
+                "third_block": config["model_config"]["third_block"],
+            }
 
-        from sandesc_models.sandesc.network_descriptor import SANDesc
+            from sandesc_models.sandesc.network_descriptor import SANDesc
 
-        network = SANDesc(**model_config).eval().to(device)
+            network = SANDesc(**model_config).eval().to(device)
 
-        weights = torch.load(custom_desc, weights_only=False)
-        network.load_state_dict(weights["state_dict"])
-        wrapper.add_custom_descriptor(network)
-        wrapper.name = f"{wrapper.name}SANDesc"
-        print(f"Using custom descriptors from {custom_desc}.\n")
+            weights = torch.load(custom_desc, weights_only=False)
+            network.load_state_dict(weights["state_dict"])
+            wrapper.add_custom_descriptor(network)
+            wrapper.name = f"{wrapper.name}SANDesc"
+            print(f"Using custom descriptors from {custom_desc}.\n")
+
+        else:
+            sandescd_path = Path("/home/mattia/Desktop/Repos/sandesc")
+            sys.path.append(str(sandescd_path))
+
+            weights = torch.load(sandescd_path / custom_desc, weights_only=False)
+            config = weights["config"]
+
+            model_config = {
+                "ch_in": config["model"]["unet_ch_in"],
+                "kernel_size": config["model"]["unet_kernel_size"],
+                "activ": config["model"]["unet_activ"],
+                "norm": config["model"]["unet_norm"],
+                "skip_connection": config["model"]["unet_with_skip_connections"],
+                "spatial_attention": config["model"]["unet_spatial_attention"],
+                "third_block": config["model"]["third_block"],
+                "dino_size": config["model"]["dino_size"],
+                "dino_layer": config["model"]["dino_layer"],
+            }
+
+            from model.network_descriptor import SANDescD
+
+            network = SANDescD(**model_config).eval().to(device)
+            network.load_state_dict(weights["state_dict"])
+            wrapper.add_custom_descriptor(network)
+            logger.info("Custom descriptor added to wrapper")
+
+            from torchinfo import summary
+
+            summary(network)
+
+            old_name = wrapper.name
+            wrapper.name = f"{wrapper.name}SANDescD" + config["model"]["dino_size"]
+            logger.info(f"Wrapper name changed from '{old_name}' to '{wrapper.name}'")
 
     # matcher params
     key = f"{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th}_mnn {max_kpts}"

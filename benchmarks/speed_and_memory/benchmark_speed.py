@@ -28,7 +28,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+    from benchmarks.utils_benchmark import fake_tqdm as tqdm
 
 try:
     import pynvml

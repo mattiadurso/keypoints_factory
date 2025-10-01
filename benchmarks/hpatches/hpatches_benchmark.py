@@ -23,12 +23,12 @@ from datetime import datetime
 
 
 from matchers.mnn import MNN
-from benchmarks.benchmark_utils import (
+from benchmarks.utils_benchmark import (
     str2bool,
     fix_rng,
     convert_numpy_types,
 )
-from benchmarks.hpatches.hpatches_benchmark_utils import (
+from benchmarks.hpatches.utils_hpatches_benchmark import (
     _is_nan,
     load_hpatches_in_memory,
     compute_matching_stats,
@@ -45,7 +45,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+    from benchmarks.utils_benchmark import fake_tqdm as tqdm
 
 
 class HPatchesBenchmark:
@@ -366,6 +366,34 @@ if __name__ == "__main__":
             old_name = wrapper.name
             wrapper.name = f"{wrapper.name}+SANDesc"
             logger.info(f"Wrapper name changed from '{old_name}' to '{wrapper.name}'")
+
+            # sandescd_path = Path("/home/mattia/Desktop/Repos/sandesc")
+            # sys.path.append(str(sandescd_path))
+
+            # weights = torch.load(sandescd_path / custom_desc, weights_only=False)
+            # config = weights["config"]
+
+            # model_config = {
+            #     "ch_in": config["model"]["unet_ch_in"],
+            #     "kernel_size": config["model"]["unet_kernel_size"],
+            #     "activ": config["model"]["unet_activ"],
+            #     "norm": config["model"]["unet_norm"],
+            #     "skip_connection": config["model"]["unet_with_skip_connections"],
+            #     "spatial_attention": config["model"]["unet_spatial_attention"],
+            #     "third_block": config["model"]["third_block"],
+            #     "dino_size": config["model"].get("dino_size", "s"),
+            # }
+
+            # from model.network_descriptor import SANDescD
+
+            # network = SANDescD(**model_config).eval().to(device)
+            # network.load_state_dict(weights["state_dict"])
+            # wrapper.add_custom_descriptor(network)
+            # logger.info("Custom descriptor added to wrapper")
+
+            # old_name = wrapper.name
+            # wrapper.name = f"{wrapper.name}+SANDescD"
+            # logger.info(f"Wrapper name changed from '{old_name}' to '{wrapper.name}'")
 
         except Exception as e:
             logger.error(f"Failed to load custom descriptors from {custom_desc}: {e}")

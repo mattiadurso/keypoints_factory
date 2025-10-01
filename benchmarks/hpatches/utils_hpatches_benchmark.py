@@ -22,7 +22,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.benchmark_utils import fake_tqdm as tqdm
+    from benchmarks.utils_benchmark import fake_tqdm as tqdm
 
 try:
     import pydegensac_  # some errors arises, to fix. For now disabled.
@@ -923,7 +923,7 @@ def compute_matching_stats(
     )
 
 
-def display_hpatches_results(
+def display_hpatches_results_(
     results_file="hpatches/results/results.json",
     partition="overall",
     method=None,
@@ -1051,3 +1051,168 @@ def display_hpatches_results(
     if tostring:
         print(df.to_string(index=False))
     return df
+
+
+import json
+from pathlib import Path
+from typing import List, Dict, Optional, Union
+
+
+def display_hpatches_results(
+    results_file: Union[str, Path] = "hpatches/results/results.json",
+    partition: str = "overall",
+    method: Optional[str] = None,
+    ths: Optional[List[int]] = None,
+    tostring: bool = True,
+) -> List[Dict[str, str]]:
+    """
+    Display HPatches benchmark results without pandas.
+
+    Args:
+        results_file: Path to the results JSON file
+        partition: Which partition to display ('overall', 'i', 'v')
+        method: Specific method to display (if None, displays all methods)
+        ths: List of thresholds to display (if None, auto-detect from results)
+        tostring: If True, print the table as a string
+
+    Returns:
+        List[Dict[str, str]]: Formatted results rows
+    """
+    # Load results
+    if isinstance(results_file, str):
+        results_file = Path(results_file)
+    if not results_file.exists():
+        raise FileNotFoundError(f"Results file not found: {results_file}")
+
+    with open(results_file, "r") as f:
+        data = json.load(f)
+
+    if not data:
+        if tostring:
+            print("No results found in the file.")
+        return []
+
+    # Filter by specific method if provided
+    if method is not None:
+        if method in data:
+            data = {method: data[method]}
+        else:
+            if tostring:
+                print(f"Method '{method}' not found in results.")
+            return []
+
+    # Auto-detect thresholds if not provided
+    if ths is None:
+        ths_detected: List[int] = []
+        for _, results in data.items():
+            if partition in results:
+                partition_data = results[partition]
+                for key in partition_data.keys():
+                    if key.startswith("repeatability_"):
+                        thr = key.split("_")[-1]
+                        try:
+                            thr_val = int(float(thr))
+                            if thr_val not in ths_detected:
+                                ths_detected.append(thr_val)
+                        except ValueError:
+                            continue
+        ths = sorted(ths_detected) if ths_detected else [1, 2, 3]
+
+    # Build rows
+    rows: List[Dict[str, str]] = []
+    for method_key, results in data.items():
+        if partition not in results:
+            continue
+        partition_data = results[partition]
+
+        # Method / Custom Desc parsing
+        if "+" in method_key:
+            method_name, custom_desc_part = method_key.split("+", 1)
+            custom_desc = custom_desc_part.split("_")[0]
+        else:
+            method_name = method_key.split("_")[0]
+            custom_desc = ""
+
+        row: Dict[str, str] = {
+            "Method": method_name,
+            "Desc": custom_desc,
+        }
+
+        # Repeatability
+        for thr in ths:
+            rep_key = f"repeatability_{thr}"
+            if rep_key in partition_data:
+                rep_data = partition_data[rep_key]
+                row[f"Rep@{thr}"] = f"{rep_data.get('mean', 0.0)*100:.1f}"
+
+        # Matching Accuracy
+        for thr in ths:
+            ma_key = f"matching_accuracy_{thr}"
+            if ma_key in partition_data:
+                ma_data = partition_data[ma_key]
+                row[f"MA@{thr}"] = f"{ma_data.get('mean', 0.0)*100:.1f}"
+
+        # Matching Score
+        for thr in ths:
+            ms_key = f"matching_score_{thr}"
+            if ms_key in partition_data:
+                ms_data = partition_data[ms_key]
+                row[f"MS@{thr}"] = f"{ms_data.get('mean', 0.0)*100:.1f}"
+
+        # Homography Accuracy
+        for thr in ths:
+            ha_key = f"homography_accuracy_{thr}"
+            if ha_key in partition_data:
+                ha_data = partition_data[ha_key]
+                row[f"HA@{thr}"] = f"{ha_data.get('mean', 0.0)*100:.1f}"
+
+        rows.append(row)
+
+    if not rows:
+        if tostring:
+            print(f"No results found for partition '{partition}'")
+        return []
+
+    # Sort by Method then Custom Desc
+    rows.sort(key=lambda r: (r.get("Method", ""), r.get("Custom Desc", "")))
+
+    # Pretty print table
+    if tostring:
+        # Determine all columns in order: fixed cols, then metrics discovered
+        fixed_cols = ["Method", "Custom Desc"]
+        metric_cols_order: List[str] = []
+        for thr in ths:
+            metric_cols_order.append(f"Rep@{thr}")
+        for thr in ths:
+            metric_cols_order.append(f"MA@{thr}")
+        for thr in ths:
+            metric_cols_order.append(f"MS@{thr}")
+        for thr in ths:
+            metric_cols_order.append(f"HA@{thr}")
+
+        # Keep only metrics that appear at least once
+        present_metrics = []
+        for col in metric_cols_order:
+            if any(col in r for r in rows):
+                present_metrics.append(col)
+
+        cols = fixed_cols + present_metrics
+
+        # Compute column widths
+        widths = {c: len(c) for c in cols}
+        for r in rows:
+            for c in cols:
+                widths[c] = max(widths[c], len(str(r.get(c, ""))))
+
+        # Build header and separator
+        header = " | ".join(c.ljust(widths[c]) for c in cols)
+        sep = "-+-".join("-" * widths[c] for c in cols)
+        print(header)
+        print(sep)
+
+        # Print rows
+        for r in rows:
+            line = " | ".join(str(r.get(c, "")).ljust(widths[c]) for c in cols)
+            print(line)
+
+    return rows
