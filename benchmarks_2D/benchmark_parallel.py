@@ -220,7 +220,7 @@ class Benchmark:
             if self.oom_safe:
                 if self.compute_repeatability:
                     del Z, Z_sampled
-                del wrapper, out, img
+                del out, img
                 gc.collect()
                 torch.cuda.empty_cache()
 
@@ -397,7 +397,9 @@ class Benchmark:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
         # Process pairs in parallel
-        pose_estimation_partial = partial(process_pose_estimation, th=self.ransac_th)
+        pose_estimation_partial = partial(
+            process_pose_estimation, th=self.ransac_th, seed=self.seed
+        )
 
         results = Parallel(n_jobs=self.njobs, verbose=0)(
             delayed(pose_estimation_partial)(pair)
@@ -450,8 +452,30 @@ class Benchmark:
         # acc_15 = (tot_e_pose < 15).mean()
         # acc_20 = (tot_e_pose < 20).mean()
 
+        unregistred = []
+        for r in results:
+            img1, img2, e_t, e_R, e_pose, inlier = r
+            if e_pose >= 180:
+                unregistred.append(r)
+
+        # optional, save images not registered
+        os.makedirs(
+            f"benchmarks/{self.benchmark_name}/results/not_registered", exist_ok=True
+        )
+        with open(
+            f"benchmarks/{self.benchmark_name}/results/not_registered/{save_key}.csv",
+            "w",
+        ) as f:
+            f.write("img1,img2,e_t,e_R,e_pose,inlier\n")
+            for r in results:
+                img1, img2, e_t, e_R, e_pose, inlier = r
+                if e_pose >= 180:
+                    f.write(f"{img1},{img2},{e_t},{e_R},{e_pose},{inlier}\n")
+
         out = {
-            "inlier": np.mean(inliers),
+            "inliers": np.mean(inliers),
+            "unregistered_pairs": len(unregistred),
+            "total_pairs": len(results),
             "auc_5": auc[0],
             "auc_10": auc[1],
             "auc_20": auc[2],
@@ -465,7 +489,11 @@ class Benchmark:
 
         # Final rounding
         for k in out:
-            out[k] = round(out[k], 1) if k == "inlier" else round(out[k] * 100, 1)
+            out[k] = (
+                round(out[k], 1)
+                if (k == "inliers" or k == "unregistered_pairs" or k == "total_pairs")
+                else round(out[k] * 100, 1)
+            )
 
         return out, timestamp
 
@@ -527,7 +555,7 @@ if __name__ == "__main__":
         help="Compute partial GHR benchmark (only graz_main_square scene)",
     )
     parser.add_argument(
-        "--feature-path",
+        "--features",
         default=None,
         help="Path to precomputed features (optional)",
     )
@@ -539,6 +567,9 @@ if __name__ == "__main__":
         "--oom-safe",
         action="store_true",
         help="Use OOM-safe feature extraction (might be slower) when method goes OOM.",
+    )
+    parser.add_argument(
+        "--sandesc_paper", action="store_true", help="Use SANDesc from the paper."
     )
     args = parser.parse_args()
 
@@ -571,41 +602,71 @@ if __name__ == "__main__":
     max_kpts = args.max_kpts
     run_tag = args.run_tag
     custom_desc = args.custom_desc
-    stats = args.stats
     seed = args.seed
     scaling_factor = args.scaling_factor
     ghr_partial = args.ghr_partial
     oom_safe = args.oom_safe
-    feature_path = args.feature_path
+    feature_path = args.features
     compute_repeatability = args.skip_repeatability
 
     # Define the wrapper
     wrapper = wrappers_manager(name=wrapper_name, device=args.device)
 
     if custom_desc is not None:
-        #  Eventually add my descriptors
-        weights = torch.load(custom_desc, weights_only=False)
-        config = weights["config"]["model_config"]
-        model = {
-            "ch_in": config["unet_ch_in"],
-            "kernel_size": config["unet_kernel_size"],
-            "activ": config["unet_activ"],
-            "norm": config["unet_norm"],
-            "skip_connection": config["unet_with_skip_connections"],
-            "spatial_attention": config["unet_spatial_attention"],
-            "third_block": config["third_block"],
-        }
+        if args.sandesc_paper:
+            #  Eventually add my descriptors
+            weights = torch.load(custom_desc, weights_only=False)
+            config = weights["config"]["model_config"]
+            model = {
+                "ch_in": config["unet_ch_in"],
+                "kernel_size": config["unet_kernel_size"],
+                "activ": config["unet_activ"],
+                "norm": config["unet_norm"],
+                "skip_connection": config["unet_with_skip_connections"],
+                "spatial_attention": config["unet_spatial_attention"],
+                "third_block": config["third_block"],
+            }
 
-        from sandesc_models.sandesc.network_descriptor import SANDesc
+            from sandesc_models.sandesc.network_descriptor import SANDesc
 
-        network = SANDesc(**model).eval()
+            network = SANDesc(**model).eval()
 
-        weights = torch.load(custom_desc, weights_only=False)
-        network.load_state_dict(weights["state_dict"])
+            weights = torch.load(custom_desc, weights_only=False)
+            network.load_state_dict(weights["state_dict"])
 
-        wrapper.add_custom_descriptor(network)
-        wrapper.name = f"{wrapper.name}+SANDesc"
-        logger.info(f"Using custom descriptors from {custom_desc}.")
+            wrapper.add_custom_descriptor(network)
+            wrapper.name = f"{wrapper.name}+SANDesc"
+            logger.info(f"Using custom descriptors from {custom_desc}.")
+
+        else:
+            import sys
+
+            sandescd_path = "/home/mattia/Desktop/Repos/sandesc"
+            sys.path.append(sandescd_path)
+            from model.network_descriptor import SANDescD
+
+            #  Eventually add my descriptors
+            weights = torch.load(Path(sandescd_path) / custom_desc, weights_only=False)
+            config = weights["config"]["model"]
+            model = {
+                "ch_in": config["unet_ch_in"],
+                "kernel_size": config["unet_kernel_size"],
+                "activ": config["unet_activ"],
+                "norm": config["unet_norm"],
+                "skip_connection": config["unet_with_skip_connections"],
+                "spatial_attention": config["unet_spatial_attention"],
+                "third_block": config["third_block"],
+                "dino_size": config["dino_size"],
+                "dino_layer": config["dino_layer"],
+            }
+
+            network = SANDescD(**model).eval()
+            network.load_state_dict(weights["state_dict"], strict=False)
+            network.load_dino()
+
+            wrapper.add_custom_descriptor(network)
+            wrapper.name = f"{wrapper.name}+SANDescD{config['dino_size']}"
+            logger.info(f"Using custom descriptors from {custom_desc}.")
 
     # matcher params
     if benchmark_name == "graz_high_res" and ghr_partial:

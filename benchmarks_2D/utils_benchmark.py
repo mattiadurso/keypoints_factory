@@ -89,9 +89,9 @@ def parse_md1500_poses(poses_file):
     return view_dict
 
 
-def process_pose_estimation(pair_matches_data, th):
+def process_pose_estimation(pair_matches_data, th, seed=0):
     """Process pose estimation for a batch of pairs."""
-    fix_rng(42)
+    fix_rng(seed)
 
     results = []
 

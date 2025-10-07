@@ -171,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--wrapper-name", type=str, default="disk-kornia")
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--max-kpts", type=int, default=2048)
-    parser.add_argument("--th", type=float, default=1.0)
+    parser.add_argument("--ransac-th", type=float, default=1.0)
     parser.add_argument("--ratio-test", type=float, default=1.0)
     parser.add_argument("--min-score", type=float, default=0.0)
     parser.add_argument("--custom-desc", type=str, default=None)
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     ratio_test = args.ratio_test
     min_score = args.min_score
     max_kpts = args.max_kpts
-    th = args.th
+    ransac_th = args.ransac_th
     custom_desc = args.custom_desc
     njobs = args.njobs
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
             logger.info(f"Wrapper name changed from '{old_name}' to '{wrapper.name}'")
 
     # matcher params
-    key = f"{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{th}_mnn {max_kpts}"
+    key = f"{wrapper.name} ratio_test_{ratio_test}_min_score_{min_score}_th_{ransac_th}_mnn {max_kpts}"
 
     # add tag to the key
     if args.run_tag is not None:
@@ -277,7 +277,7 @@ if __name__ == "__main__":
         ratio_test=ratio_test,
         min_score=min_score,
         max_kpts=max_kpts,
-        th=th,
+        th=ransac_th,
         overwrite_extraction=args.overwrite_extraction,
         device=device,
         njobs=njobs,
