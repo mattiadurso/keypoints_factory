@@ -220,7 +220,6 @@ class HPatchesBenchmark:
             }
 
             # Add metrics for each threshold
-            # Replace hardcoded hom_thresholds with self.thresholds
             for thr in self.thresholds:
                 thr_data = category_data[category_data["thr"] == thr]
                 if len(thr_data) == 0:

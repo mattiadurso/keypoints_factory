@@ -25,7 +25,7 @@ from functools import partial
 from joblib import Parallel, delayed, parallel_backend
 
 from matchers.mnn import MNN
-from benchmarks.utils_benchmark import (
+from benchmarks_2D.utils_benchmark import (
     fix_rng,
     parse_pair,
     print_metrics,
@@ -34,7 +34,7 @@ from benchmarks.utils_benchmark import (
     parse_poses,
     load_depth,
 )
-from benchmarks.repeatability_utils import compute_repeatabilities_from_kpts
+from benchmarks_2D.repeatability_utils import compute_repeatabilities_from_kpts
 
 
 # Setup logging
@@ -47,7 +47,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.utils_benchmark import fake_tqdm as tqdm
+    from benchmarks_2D.utils_benchmark import fake_tqdm as tqdm
 
 
 class Benchmark:

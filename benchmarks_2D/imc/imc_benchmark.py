@@ -12,7 +12,7 @@ import torch
 import logging
 
 from matchers.mnn import MNN
-from benchmarks.imc.utils_imc_benchmark import (
+from benchmarks_2D.imc.utils_imc_benchmark import (
     extract_image_matching_benchmark,
     match_features,
     import_data_to_benchmark,
