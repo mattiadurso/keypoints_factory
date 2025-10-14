@@ -25,7 +25,7 @@ def evaluate_scene(target_rec, input_rec, deg=True):
     """
     Given two dictionaries {"image_idx":{qvec, tvec}}, evaluate the relative pose between all the possible pairs of images.
     Args:
-        images_gt_dict:   dictionary with the ground truth poses.
+        images_target_dict:   dictionary with the ground truth poses.
         images_pred_dict: dictionary with the predicted poses.
         deg: if True, the errors are returned in degrees else in radians. Default is True.
     Returns:
@@ -39,63 +39,62 @@ def evaluate_scene(target_rec, input_rec, deg=True):
         "t_error": [],
         "max_error": [],
     }
-    target_images = [img.name for img in target_rec.images.values()]
-    input_images = [img.name for img in input_rec.images.values()]
+    target_images = np.array(
+        sorted([img.name for img in target_rec.images.values()])
+    )  # remove eventual subdirectory in the image name (e.g. camera calibration folder)
+    input_images = np.array(sorted([img.name for img in input_rec.images.values()]))
 
     # for each pair of images in the ground truth
     for image_1_path, image_2_path in combinations(target_images, 2):
-        # set to inf if both images have not been registered (= in *_pred_dict)
         if not (
-            image_1_path in input_images and image_2_path in input_images
+            (image_1_path in input_images) and (image_2_path in input_images)
         ):  # working?
             q_err, t_err, max_error = np.inf, np.inf, np.inf
+            logger.info(f"Image {image_1_path} or {image_2_path} not in input model.")
         else:
             # get the rotation and translation for two images (target)
-            R1_gt, t1_gt = (
-                target_rec.find_image_with_name(image_1_path)
-                .cam_from_world()
-                .rotation.matrix(),
-                target_rec.find_image_with_name(image_1_path)
-                .cam_from_world()
-                .translation,
+            R1_target, t1_target = (
+                target_rec.find_image_with_name(
+                    image_1_path
+                ).cam_from_world.rotation.matrix(),
+                target_rec.find_image_with_name(
+                    image_1_path
+                ).cam_from_world.translation,
             )
-            R2_gt, t2_gt = (
-                target_rec.find_image_with_name(image_2_path)
-                .cam_from_world()
-                .rotation.matrix(),
-                target_rec.find_image_with_name(image_2_path)
-                .cam_from_world()
-                .translation,
+            R2_target, t2_target = (
+                target_rec.find_image_with_name(
+                    image_2_path
+                ).cam_from_world.rotation.matrix(),
+                target_rec.find_image_with_name(
+                    image_2_path
+                ).cam_from_world.translation,
             )
 
-            # get the rotation and translation for two images (input)
+            # Be careful here: image names in input and target might contain subdirectories. I am not accounting for that.
+            # since VGGT read images from
             R1_input, t1_input = (
-                input_rec.find_image_with_name(image_1_path)
-                .cam_from_world()
-                .rotation.matrix(),
-                input_rec.find_image_with_name(image_1_path)
-                .cam_from_world()
-                .translation,
+                input_rec.find_image_with_name(
+                    image_1_path
+                ).cam_from_world.rotation.matrix(),
+                input_rec.find_image_with_name(image_1_path).cam_from_world.translation,
             )
             R2_input, t2_input = (
-                input_rec.find_image_with_name(image_2_path)
-                .cam_from_world()
-                .rotation.matrix(),
-                input_rec.find_image_with_name(image_2_path)
-                .cam_from_world()
-                .translation,
+                input_rec.find_image_with_name(
+                    image_2_path
+                ).cam_from_world.rotation.matrix(),
+                input_rec.find_image_with_name(image_2_path).cam_from_world.translation,
             )
 
             # compute the relative pose between the two images (target)
-            R_gt = R2_gt @ R1_gt.T
-            t_gt = t2_gt - R_gt @ t1_gt
+            R_target = R2_target @ R1_target.T
+            t_target = t2_target - R_target @ t1_target
 
             # compute the relative pose between the two images (input)
             R_pred = R2_input @ R1_input.T
             t_pred = t2_input - R_pred @ t1_input
 
             # compute the error
-            q_err, t_err = evaluate_R_t(R_pred, t_pred, R_gt, t_gt, deg=deg)
+            q_err, t_err = evaluate_R_t(R_pred, t_pred, R_target, t_target, deg=deg)
             max_error = max(q_err, t_err)
 
         # append to the dataframe
@@ -103,19 +102,19 @@ def evaluate_scene(target_rec, input_rec, deg=True):
         df["image2"].append(image_2_path)
         df["q_error"].append(q_err)
         df["t_error"].append(t_err)
-        df["max_error"].append(max_error if max_error < 10 else np.inf)
+        df["max_error"].append(max_error)  # if max_error < 10 else np.inf)
 
     return pd.DataFrame(df)
 
 
 def eval_colmap_model(
-    model_path, gt_path, thrs=[1, 3, 5], return_df=False, AUC_col="max_error"
+    model_path, target_path, thrs=[1, 3, 5], return_df=False, AUC_col="max_error"
 ):
     """
-    Given a scene path, evaluate the model in the given folder versus the ground truth in the gt_folder.
+    Given a scene path, evaluate the model in the given folder versus the ground truth in the target_folder.
     Args:
         model_path: path to the model to evaluate.
-        gt_path:    path to the ground truth model.
+        target_path:    path to the ground truth model.
         thrs:       list of thresholds for the AUC computation.
         return_df:  if True, return the dataframe with the errors.
         AUC_col:    column to compute the AUC. Default is "max_error". Other options are "q_error" and "t_error".
@@ -127,15 +126,15 @@ def eval_colmap_model(
     if not os.path.exists(model_path):
         raise Exception(f"Path {model_path} does not exist.")
 
-    if not os.path.exists(gt_path):
-        raise Exception(f"Path {gt_path} does not exist.")
+    if not os.path.exists(target_path):
+        raise Exception(f"Path {target_path} does not exist.")
 
     # read models
     rec_input = pycolmap.Reconstruction(model_path)
-    rec_gt = pycolmap.Reconstruction(gt_path)
+    rec_target = pycolmap.Reconstruction(target_path)
 
     # evaluate scene (each pair of images) and compute the AUC
-    df = evaluate_scene(rec_gt, rec_input)
+    df = evaluate_scene(rec_target, rec_input)
     AUC_score_max = np.array(compute_AUC(df[AUC_col], thrs))
 
     if return_df:
@@ -146,10 +145,9 @@ def eval_colmap_model(
 
 def eval_colmap_model_all_scenes(
     input_path,
-    gt_path,
+    target_path,
     input_folder="colmap/sparse/0",
-    gt_folder="sparse_gt",
-    mapper="colmap",
+    target_folder="sparse",
     thrs=[0.5, 1, 3, 5, 10],
     AUC_col="max_error",
     n_jobs=-1,
@@ -157,62 +155,66 @@ def eval_colmap_model_all_scenes(
     """
     Evaluate the model on all the scenes in the data_path using parallel processing.
     These must be in COLMAP format. The model is evaluated at the specified thresholds.
-
-    Args:
-        scene_path (Path): Path to the directory containing the COLMAP models for each scene.
-        gt_path (Path, optional): Path to the ground truth models for each scene. Defaults to "./sparse".
-        thrs (List[int], optional): List of thresholds for AUC computation.
-        AUC_col (str, optional): Column to compute the AUC from in the evaluation DataFrame.
-                                 Defaults to "max_error". Other options are "q_error" and "t_error".
-        n_jobs (int, optional): Number of parallel jobs to run. -1 means using all available CPU cores. Defaults to -1. # max=16
-
-    Returns:
-        pd.DataFrame: A DataFrame with the AUC values for each scene, indexed by scene name.
     """
 
-    input_paths = sorted(glob.glob(f"{input_path}/*/{input_folder}"))
-    target_paths = sorted(glob.glob(f"{gt_path}/*/{gt_folder}"))
+    # Get scene names from both directories
+    input_scene_names = set(os.listdir(input_path))
+    target_scene_names = set(os.listdir(target_path))
 
-    print(f"Found {len(input_paths)} scenes in {input_path}.")
-    print(f"Found {len(target_paths)} scenes in {gt_path}.")
+    # Keep only common scenes
+    common_scenes = sorted(input_scene_names & target_scene_names)
 
-    # chek they have same number of scenes
-    if len(input_paths) != len(target_paths):
-        raise Exception(
-            f"Number of scenes in {input_path} ({len(input_paths)}) and {gt_path} ({len(target_paths)}) do not match."
-        )
+    print(f"Found {len(common_scenes)} common scenes.")
 
-    # check scene names match
-    input_scene_names = [os.path.basename(os.path.dirname(p)) for p in input_paths]
-    target_scene_names = [os.path.basename(os.path.dirname(p)) for p in target_paths]
-    if input_scene_names != target_scene_names:
-        raise Exception(f"Scene names in {input_path} and {gt_path} do not match.")
+    if len(common_scenes) == 0:
+        logger.warning("No common scenes found!")
+        return pd.DataFrame()
 
-    s = time.time()
+    # Build paths for common scenes only
+    input_paths = [
+        os.path.join(input_path, scene, input_folder) for scene in common_scenes
+    ]
+    target_paths = [
+        os.path.join(target_path, scene, target_folder) for scene in common_scenes
+    ]
+
+    # Verify paths exist
+    valid_pairs = []
+    valid_scenes = []
+    for inp, tgt, scene in zip(input_paths, target_paths, common_scenes):
+        if os.path.exists(inp) and os.path.exists(tgt):
+            valid_pairs.append((inp, tgt))
+            valid_scenes.append(scene)
+        else:
+            logger.warning(f"Skipping {scene}: paths don't exist")
+
+    print(f"Evaluating {len(valid_pairs)} valid scenes.")
+
     # Use joblib to parallelize the evaluation of each scene
     results = Parallel(n_jobs=n_jobs)(
         delayed(eval_colmap_model)(
             input, target, thrs=thrs, return_df=False, AUC_col=AUC_col
         )
         for input, target in tqdm(
-            zip(input_paths, target_paths),
+            valid_pairs,
             desc="Evaluating scenes",
-            total=len(input_paths),
+            total=len(valid_pairs),
         )
     )
-    print(results, input_scene_names)
+
     # Process results and create the DataFrame
     res = {}
-    for auc_scores, scene_name in zip(results, input_scene_names):
+    for auc_scores, scene_name in zip(results, valid_scenes):
         if auc_scores is not None:
             res[scene_name] = auc_scores
 
     # Creating the DataFrame and transposing it to have the scenes as rows
     df_res_colmap = pd.DataFrame(res, index=thrs).transpose()
+    # sort by scene name
+    df_res_colmap = df_res_colmap.sort_index()
 
     # Rename the columns as {model}@{thrs}
-    df_res_colmap.columns = [f"{mapper}@{thr}" for thr in thrs]
-    print(f"Evaluation completed in {time.time() - s:.2f} seconds.")
+    df_res_colmap.columns = [f"auc@{thr}" for thr in thrs]
     return df_res_colmap.round(2)
 
 
@@ -223,13 +225,13 @@ if __name__ == "__main__":
         "--input-model",
         type=str,
         required=True,
-        help="Path to the input 3D model file or directory.",
+        help="Path to the input 3D model file or directorys. E.g., scenes/scene_name/colmap/sparse/0 or scenes/",
     )
     parser.add_argument(
         "--target-model",
         type=str,
         required=True,
-        help="Path to the target 3D model file or directory.",
+        help="Path to the target 3D model file or directorys. E.g., scenes/scene_name/colmap/sparse/0 or scenes/",
     )
     parser.add_argument(
         "--output-dir",
@@ -243,10 +245,28 @@ if __name__ == "__main__":
         help="If set, evaluate all scenes in the input directory.",
     )
     parser.add_argument(
+        "--input-folder",
+        type=str,
+        default="colmap/sparse/0",
+        help="Subfolder in each scene folder where the input model is located. Used only if --many-scenes is set.",
+    )
+    parser.add_argument(
+        "--target-folder",
+        type=str,
+        default="sparse",
+        help="Subfolder in each scene folder where the ground truth model is located. Used only if --many-scenes is set.",
+    )
+    parser.add_argument(
+        "--mapper",
+        type=str,
+        default="colmap",
+        help="Name of the mapper used to generate the input model. Used only if --many-scenes is set.",
+    )
+    parser.add_argument(
         "--thrs",
         type=float,
         nargs="+",
-        default=[1, 3, 5, 10],
+        default=[1, 3, 5, 10, 15, 30],
         help="Thresholds for AUC computation.",
     )
     args = parser.parse_args()
@@ -254,6 +274,33 @@ if __name__ == "__main__":
     s = time.time()
     os.makedirs(args.output_dir, exist_ok=True)
 
-    ### stuff
+    if args.many_scenes:
+        df_res = eval_colmap_model_all_scenes(
+            args.input_model,
+            args.target_model,
+            thrs=args.thrs,
+            n_jobs=16,
+            input_folder=args.input_folder,
+            target_folder=args.target_folder,
+            mapper=args.mapper,
+        )
+        df_res.to_csv(
+            os.path.join(args.output_dir, f"results_all_scenes_{args.mapper}.csv"),
+            index=True,
+        )
+        print(df_res)
+    else:
+        auc_scores, df = eval_colmap_model(
+            args.input_model,
+            args.target_model,
+            thrs=args.thrs,
+            return_df=True,
+        )
+        print(f"AUC scores at {args.thrs}: {auc_scores}")
+        df.to_csv(
+            os.path.join(args.output_dir, f"results_single_scene_{args.mapper}.csv"),
+            index=False,
+        )
+        print(df)
 
     print(f"Total time: {time.time() - s:.2f} seconds.")

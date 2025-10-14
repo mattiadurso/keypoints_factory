@@ -19,3 +19,5 @@ benchmarks*/*/run.py
 benchmarks*/graz_high_res/data/graz_castle/depth/26/IMG_4125_frame_000001.h5
 benchmarks_3D/eth3d/*
 benchmarks_3D/results/*
+gen_ghr_txt.ipynb
+.vscode/*.json
