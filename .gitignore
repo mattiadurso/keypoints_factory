@@ -21,3 +21,4 @@ benchmarks_3D/eth3d/*
 benchmarks_3D/results/*
 gen_ghr_txt.ipynb
 .vscode/*.json
+benchmarks_2D/hpatches/run_batch.py
