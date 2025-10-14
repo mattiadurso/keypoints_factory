@@ -155,7 +155,7 @@ class HPatchesBenchmark:
             hpatches,
             max_kpts=self.max_kpts,
             px_thrs=self.thresholds,
-            ransac_thresholds=[0.125, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5],
+            ransac_thresholds=[0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5],
             njobs=self.njobs,
         )
 

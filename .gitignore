@@ -5,13 +5,17 @@ methods/*
 sandesc_models/*
 __bin/*
 nohup.out
-benchmarks/read_linear_scaling_dedode.ipynb
+benchmarks*/read_linear_scaling_dedode.ipynb
 
 # IMC benchmark files
-benchmarks/imc/to_import_imc/*
-benchmarks/imc/image-matching-benchmark
+benchmarks*/imc/to_import_imc/*
+benchmarks*/imc/image-matching-benchmark
 
 # results, data and intermediate files
-benchmarks/*/intermediate/*
-benchmarks/*/*results/
-benchmarks/*/data
+benchmarks*/*/intermediate/*
+benchmarks*/*/*results/
+benchmarks*/*/data
+benchmarks*/*/run.py
+benchmarks*/graz_high_res/data/graz_castle/depth/26/IMG_4125_frame_000001.h5
+benchmarks_3D/eth3d/*
+benchmarks_3D/results/*
