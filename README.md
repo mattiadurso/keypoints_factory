@@ -125,7 +125,7 @@ The benchmark computes the following metrics:
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name ghr 
+python benchmarks_2D/benchmark_parallel.py --benchmark-name ghr 
 ```
 
 ### MegaDepth-1500
@@ -135,7 +135,7 @@ The benchmark computes the same metrics as the Graz High-Resolution Benchmark.
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name md  
+python benchmarks_2D/benchmark_parallel.py --benchmark-name md  
 ```
 ------
 ### MegaDepth-View 
@@ -145,7 +145,7 @@ The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolu
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name mdv  
+python benchmarks_2D/benchmark_parallel.py --benchmark-name mdv  
 ```
 
 ---
@@ -156,7 +156,7 @@ The benchmark computes Number of Inliers and AUC metrics as the Graz High-Resolu
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name mda  
+python benchmarks_2D/benchmark_parallel.py --benchmark-name mda  
 ```
 
 
@@ -168,7 +168,7 @@ The benchmark computes the same metrics as the Graz High-Resolution Benchmark, e
 
 Use the following command to run it:
 ```bash
-python benchmarks/benchmark_parallel.py --benchmark-name sc  
+python benchmarks_2D/benchmark_parallel.py --benchmark-name sc  
 ```
 
 ------
@@ -194,7 +194,7 @@ The benchmark computes the following metrics:
 
 Use the following command to run it:
 ```bash
-python benchmarks/hpatches/hpatches_benchmark.py 
+python benchmarks_2D/hpatches/hpatches_benchmark.py 
 ```
 --- 
 
@@ -216,8 +216,7 @@ Among the metrics computed by the benchmark, the following are usually found in 
 
 Use the following command to run it:
 ```bash
-python benchmarks/hpatches/imc_benchmark.py  # For a single test
-python benchmarks/imc/run_imc.py             # For battery tests
+python benchmarks_2D/imc/imc_benchmark.py 
 ```
 --- 
 
@@ -237,7 +236,7 @@ It uses a consistent environment to ensure fair comparisons across methods.
 
 Use the following command to run it:
 ```bash
-python benchmarks/speed_and_memory/speed.py
+python benchmarks_2D/speed_and_memory/speed.py
 ```
 
 
