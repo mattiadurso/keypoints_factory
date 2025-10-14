@@ -382,3 +382,13 @@ class MethodWrapper(ABC):
         if self.custom_descriptor is not None:
             self.custom_descriptor.to(device)
         return self
+
+    # retrocompatibility
+    def img_from_numpy(self, img: np.ndarray, device: str = None) -> Tensor:
+        device = device if device is not None else self.device
+
+        s = 14 if self.name.endswith("-G") else 16
+
+        img = img[: img.shape[0] // s * s, : img.shape[1] // s * s]
+        img_out = torch.from_numpy(img.copy()).permute(2, 0, 1) / 255.0
+        return img_out.to(self.device).half()
