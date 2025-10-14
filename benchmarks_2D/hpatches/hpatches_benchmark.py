@@ -23,12 +23,12 @@ from datetime import datetime
 
 
 from matchers.mnn import MNN
-from benchmarks.utils_benchmark import (
+from benchmarks_2D.utils_benchmark import (
     str2bool,
     fix_rng,
     convert_numpy_types,
 )
-from benchmarks.hpatches.utils_hpatches_benchmark import (
+from benchmarks_2D.hpatches.utils_hpatches_benchmark import (
     _is_nan,
     load_hpatches_in_memory,
     compute_matching_stats,
@@ -45,7 +45,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.utils_benchmark import fake_tqdm as tqdm
+    from benchmarks_2D.utils_benchmark import fake_tqdm as tqdm
 
 
 class HPatchesBenchmark:
@@ -53,7 +53,7 @@ class HPatchesBenchmark:
 
     def __init__(
         self,
-        data_path: str = "benchmarks/hpatches/data/hpatches-sequences-release",
+        data_path: str = "benchmarks_2D/hpatches/data/hpatches-sequences-release",
         max_kpts: int = 2048,
         thresholds: List[float] = [1, 2, 3, 4, 5],
         njobs: int = -1,
@@ -100,13 +100,13 @@ class HPatchesBenchmark:
 
         # save keypoints and descriptors in a dict
         features_dict = {"keypoints": keypoints, "descriptors": descriptors}
-        os.makedirs("benchmarks/hpatches/intermediate", exist_ok=True)
+        os.makedirs("benchmarks_2D/hpatches/intermediate", exist_ok=True)
         torch.save(
             features_dict,
-            f"benchmarks/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth",
+            f"benchmarks_2D/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth",
         )
         logger.info(
-            f"Features saved to benchmarks/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth"
+            f"Features saved to benchmarks_2D/hpatches/intermediate/{wrapper.name}_{self.max_kpts}kpts.pth"
         )
         return keypoints, descriptors
 
@@ -149,11 +149,19 @@ class HPatchesBenchmark:
             aggregated_df,
             stats_homography_df,
             aggregated_homography_accuracy_df,
-        ) = compute_matching_stats(keypoints, matches, hpatches, njobs=self.njobs)
+        ) = compute_matching_stats(
+            keypoints,
+            matches,
+            hpatches,
+            max_kpts=self.max_kpts,
+            px_thrs=self.thresholds,
+            ransac_thresholds=[0.125, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5],
+            njobs=self.njobs,
+        )
 
         # csv
         if self.save_csv:
-            results_dir = Path("benchmarks/hpatches/results/csv")
+            results_dir = Path("benchmarks_2D/hpatches/results/csv")
             results_dir.mkdir(parents=True, exist_ok=True)
 
             stats_df.to_csv(
@@ -212,9 +220,8 @@ class HPatchesBenchmark:
             }
 
             # Add metrics for each threshold
-            for (
-                thr
-            ) in self.thresholds:  # Use self.thresholds instead of hardcoded [1, 2, 3]
+            # Replace hardcoded hom_thresholds with self.thresholds
+            for thr in self.thresholds:
                 thr_data = category_data[category_data["thr"] == thr]
                 if len(thr_data) == 0:
                     continue
@@ -258,23 +265,25 @@ class HPatchesBenchmark:
                 }
 
                 # Homography Accuracy - get from homography_data
-                hom_data = homography_data[
-                    (homography_data["accuracy_thr"] == float(thr))
-                    & (
-                        homography_data["ransac_thr"] == 3.0
-                    )  # use 3.0 as default ransac threshold
+                hom_data_for_thr = homography_data[
+                    homography_data["accuracy_thr"] == float(thr)
                 ]
-                if len(hom_data) > 0:
+                if len(hom_data_for_thr) > 0:
+                    # Get the row with highest homography accuracy across all ransac_thr
+                    best_idx = hom_data_for_thr["homography_accuracy"].idxmax()
+                    best_row = hom_data_for_thr.loc[best_idx]
+
                     results[category][f"homography_accuracy_{thr}"] = {
-                        "mean": float(hom_data["homography_accuracy"].iloc[0]),
-                        "median": float(hom_data["homography_accuracy"].iloc[0]),
+                        "mean": float(best_row["homography_accuracy"]),
+                        "median": float(best_row["homography_accuracy"]),
+                        "best_ransac_thr": float(best_row["ransac_thr"]),
                     }
                 else:
                     results[category][f"homography_accuracy_{thr}"] = {
                         "mean": 0.0,
                         "median": 0.0,
+                        "best_ransac_thr": None,
                     }
-
                 # Match statistics
                 results[category][f"match_stats_{thr}"] = {
                     "total_matches_mean": float(row["mean_n_matches_proposed"]),
@@ -305,7 +314,7 @@ if __name__ == "__main__":
     parser.add_argument("--custom-desc", type=str, default=None)
     parser.add_argument("--stats", type=str2bool, default=False)
     parser.add_argument("--save-csv", type=str2bool, default=True)
-    parser.add_argument("--njobs", type=int, default=16)
+    parser.add_argument("--njobs", type=int, default=-1)
     parser.add_argument(
         "--thresholds",
         type=float,
@@ -418,7 +427,7 @@ if __name__ == "__main__":
     )
 
     # create if not exists
-    results_path = Path("benchmarks/hpatches/results")
+    results_path = Path("benchmarks_2D/hpatches/results")
     os.makedirs(results_path, exist_ok=True)
 
     if not os.path.exists(results_path / "results.json"):

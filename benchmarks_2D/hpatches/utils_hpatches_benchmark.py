@@ -22,19 +22,7 @@ except ImportError:
     logger.info(
         "tqdm not found, you'll get no progress bars. Install it with `pip install tqdm`."
     )
-    from benchmarks.utils_benchmark import fake_tqdm as tqdm
-
-try:
-    import pydegensac_  # some errors arises, to fix. For now disabled.
-
-    pydegensac_found = True
-except ImportError:
-    pydegensac_found = False
-    import cv2
-
-    logger.warning(
-        "pydegensac not found, running RANSAC from cv2 which is less robust. Install it with `pip install pydegensac`."
-    )
+    from benchmarks_2D.utils_benchmark import fake_tqdm as tqdm
 
 
 def load_hpatches_in_memory(wrapper, root: str | Path, max_workers: int = 16) -> Dict:
@@ -267,8 +255,8 @@ def compute_corner_error(
     img0_shape: tuple[int, int] | torch.Tensor,
     img1_shape: tuple[int, int] | torch.Tensor,
     mode: str,
-    ransac_homography_threshold: list[float] | None = None,
-    ransac_max_iters: int = 5000,
+    ransac_homography_threshold: list[float],
+    ransac_max_iters: int = 10_000,
     njobs: int = 1,
 ) -> list[dict]:
     """
@@ -286,10 +274,6 @@ def compute_corner_error(
     """
     assert xy0_matched.shape == xy1_matched.shape and xy0_matched.shape[1] == 2
     assert H0_1.shape == (3, 3)
-
-    if ransac_homography_threshold is None:
-        # keep short & practical; extend if you want a denser sweep
-        ransac_homography_threshold = [1.0, 3.0, 5.0]
 
     device = xy0_matched.device
     n_matches = int(xy0_matched.shape[0])
@@ -316,26 +300,14 @@ def compute_corner_error(
     H_gt = H0_1.detach()
 
     def _solve_one(thr: float):
-        if pydegensac_found:
-            H_est, mask = pydegensac.findHomography(
-                xy0_np,
-                xy1_np,
-                px_th=thr,  # pydegensac threshold is diameter, not radius
-                max_iters=ransac_max_iters,
-                conf=0.99999999,
-                laf_consistensy_coef=0,
-                error_type="sampson",
-                symmetric_error_check=True,
-            )
-        else:
-            H_est, mask = cv2.findHomography(
-                xy0_np,
-                xy1_np,
-                method=cv2.RANSAC,
-                ransacReprojThreshold=float(thr),
-                maxIters=int(ransac_max_iters),
-                confidence=0.99999999,
-            )
+        H_est, mask = cv2.findHomography(
+            xy0_np,
+            xy1_np,
+            method=cv2.RANSAC,
+            ransacReprojThreshold=float(thr),
+            maxIters=int(ransac_max_iters),
+            confidence=0.999999,
+        )
         if H_est is None:
             return {
                 "valid_homography": False,
@@ -568,6 +540,7 @@ def compute_matching_stats_homography(
     mode: str = "hpatches",
     matches=None,  # proposed matches (M,2) [idx0, idx1]
     px_thrs: List[float] = [1, 2, 3, 4, 5],
+    ransac_thresholds: List[float] | None = None,  # Add this parameter
     compute_coverage: bool = True,
     coverage_kernel_size: int = 9,
     evaluate_corner_error: bool = True,
@@ -697,7 +670,10 @@ def compute_matching_stats_homography(
     # ---- Homography evaluation (fills list_hstats) ----
     list_hstats = []
     if evaluate_corner_error:
-        ransac_homography_threshold = px_thrs
+        # Use custom RANSAC thresholds if provided, otherwise use px_thrs
+        if ransac_thresholds is None:
+            ransac_thresholds = [0.125, 0.5, 0.75, 1, 1.5, 2, 2.5, 3]
+
         if matches.numel() >= 8:
             i0 = matches[:, 0].clamp(min=0, max=max(0, xy0.shape[0] - 1))
             i1 = matches[:, 1].clamp(min=0, max=max(0, xy1.shape[0] - 1))
@@ -710,8 +686,8 @@ def compute_matching_stats_homography(
                 img0_shape=img0_shape,
                 img1_shape=img1_shape,
                 mode=mode,
-                ransac_homography_threshold=ransac_homography_threshold,
-                ransac_max_iters=5000,
+                ransac_homography_threshold=ransac_thresholds,
+                ransac_max_iters=10_000,
                 njobs=1,
             )
             for ce in ce_list:
@@ -724,6 +700,7 @@ def compute_matching_stats_homography(
                     }
                 )
         else:
+            # If not enough matches, use px_thrs for consistency in output
             for thr in px_thrs:
                 list_hstats.append(
                     {
@@ -743,6 +720,7 @@ def compute_matching_stats(
     hpatches: Dict,
     max_kpts: int = 999_999,
     px_thrs: float | list[float] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    ransac_thresholds: list[float] | None = None,
     njobs: int = 16,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -766,7 +744,7 @@ def compute_matching_stats(
 
         img0_shape = imgs[0].shape[-2:]
         img1_shape = imgs[j].shape[-2:]
-        H01 = torch.as_tensor(homs[j], dtype=torch.float32)  # H_1_{j+1}
+        H01 = torch.as_tensor(homs[j], dtype=torch.float32)
 
         xy0 = keypoints[folder_name][0]
         xy1 = keypoints[folder_name][j]
@@ -775,7 +753,7 @@ def compute_matching_stats(
             xy1 = xy1[:max_kpts]
 
         pair_key = f"1_{j+1}"
-        pair_matches = matches.get(folder_name, {}).get(pair_key, None)
+        m01 = matches.get(folder_name, {}).get(pair_key, None)
 
         # Inner call MUST be single-threaded to avoid oversubscription
         list_stats, list_hstats, list_cov = compute_matching_stats_homography(
@@ -785,8 +763,9 @@ def compute_matching_stats(
             img0_shape=img0_shape,
             img1_shape=img1_shape,
             mode="hpatches",
-            matches=pair_matches,
+            matches=m01,
             px_thrs=px_thrs,
+            ransac_thresholds=ransac_thresholds,
             compute_coverage=True,
             coverage_kernel_size=9,
             evaluate_corner_error=True,
